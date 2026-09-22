@@ -11,7 +11,9 @@ api_key = "jv_live_xxx"                            # hosted route only (jv_live_
 model = "jev-latest"
 
 # cloudflare route: POST /client/v4/accounts/{account_id}/ai/run, model typesafe/jev
-# (wrangler whoami → account_id; wrangler auth token → api_token)
+# Keys mirror the env vars (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN) so config
+# and environment stay interchangeable. wrangler whoami → account id,
+# wrangler auth token → token.
 [cloudflare]
-account_id = "your-cloudflare-account-id"
-api_token = "your-cloudflare-api-token"
+CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"
+CLOUDFLARE_API_TOKEN = "your-cloudflare-api-token"

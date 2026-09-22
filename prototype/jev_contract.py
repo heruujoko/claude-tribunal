@@ -55,8 +55,10 @@ def provider_config():
     """Returns (url, key, model, wrap) for the selected provider. wrap=True puts
     state+questions inside an `input` object (Cloudflare /ai/run shape)."""
     if PROVIDER == "cloudflare":
-        account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", _CF.get("account_id", ""))
-        token = os.environ.get("CLOUDFLARE_API_TOKEN", _CF.get("api_token", ""))
+        account = os.environ.get("CLOUDFLARE_ACCOUNT_ID",
+                                 _CF.get("CLOUDFLARE_ACCOUNT_ID", ""))
+        token = os.environ.get("CLOUDFLARE_API_TOKEN",
+                               _CF.get("CLOUDFLARE_API_TOKEN", ""))
         url = (f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
                if account else "https://api.cloudflare.com/client/v4/accounts/MISSING/ai/run")
         return url, token, _J.get("model", "typesafe/jev"), True
