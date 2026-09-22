@@ -41,7 +41,7 @@ Stdlib only (`json`, `os`, `re`, `sys`, `tomllib`, `urllib.request`) — no pip 
 - `docs/plans/2026-09-22-custom-command-validator.md` — **implementation plan: 7 TDD tasks with complete code, execute task-by-task**
 - `docs/research/2026-09-22-research-findings.md` — verified hook contract + jev API facts (source of truth for hook behavior; don't re-derive from memory)
 - `prototype/` — throwaway contract prover; delete once `hooks/validator.py` passes tests
-- `JOURNEY.md` — chronological decision log. **Append a dated entry for every meaningful decision/discovery** — this project records its history there.
+- `JOURNEY.md` — chronological decision log. **Refresh it before every commit that carries a meaningful change** — the JOURNEY entry lands in the same commit as the change it describes. A commit that changes behavior without a JOURNEY entry is incomplete.
 
 ## Conventions
 

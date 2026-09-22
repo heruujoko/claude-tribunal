@@ -81,5 +81,18 @@ inside `input`, uses model id `typesafe/jev`, and auths with a Cloudflare token 
 cost fields there (billing = Cloudflare credits). Prototype now speaks both envelopes
 (`[jev] provider` in config.toml); evidence table added to EVIDENCE.md.
 
+**14. Pre-token security pass.** Before real credentials landed in `config.toml`, a
+full-repo review found no vulnerabilities and three leak-path hygiene gaps — all fixed
+in one commit: `.env`/`.env.*` gitignored (env-var creds are a documented interface,
+wrangler creates `.env` files), prototype output now redacts the key if a server ever
+echoes it (paste-into-EVIDENCE path), inline "never fill this file" warnings on
+`config.toml.example` cred lines, `chmod 600 config.toml`. Safe-to-fill verdict given.
+
+**15. CLAUDE.md + the JOURNEY-before-commit rule.** Repo guidance for future Claude
+instances created: the fail-to-human invariant, commands, provider model, doc map.
+New convention adopted at the same time (user decision): **a commit that changes
+behavior without a JOURNEY entry is incomplete** — the entry lands in the same commit
+as the change it describes. This entry is the first under that rule.
+
 **Next (unwritten):** live-key verdict evidence → implement the plan → self-review →
 first working plugin install.
