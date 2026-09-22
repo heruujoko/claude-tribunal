@@ -11,11 +11,26 @@ Evidence lands in prototype/EVIDENCE.md — the baseline for hooks/validator.py.
 import json
 import os
 import sys
+import tomllib
 import urllib.error
 import urllib.request
 
-URL = os.environ.get("CCV_JEV_URL", "https://jevtypesafeai.com/api/v1/decide")
-KEY = os.environ.get("JEV_API_KEY", "jv_live_prototype_dummy_key")
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _toml():
+    path = os.path.join(_ROOT, "config.toml")
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return tomllib.load(f).get("jev", {})
+    return {}
+
+
+_T = _toml()
+# Precedence: env var > config.toml > default. config.toml is gitignored; fill it for live tests.
+URL = os.environ.get("CCV_JEV_URL", _T.get("url", "https://jevtypesafeai.com/api/v1/decide"))
+KEY = os.environ.get("JEV_API_KEY", _T.get("api_key", "jv_live_prototype_dummy_key"))
+MODEL = _T.get("model", "jev-latest")
 MIN_CONFIDENCE = 0.5
 
 INSTRUCTIONS = (
@@ -87,9 +102,10 @@ def live(body):
 def main():
     mock = "--mock" in sys.argv
     print(f"PROTOTYPE jev contract  |  mode={'MOCK (documented shape)' if mock else 'LIVE'}"
-          f"  |  url={URL}  |  key={'set' if os.environ.get('JEV_API_KEY') else 'DUMMY'}\n")
+          f"  |  url={URL}  |  model={MODEL}  |  "
+          f"key={'set' if 'dummy' not in KEY and 'xxx' not in KEY else 'MISSING — fill config.toml'}\n")
     for name, tool, tool_input, cwd in CASES:
-        body = build_request(tool, tool_input, cwd)
+        body = build_request(tool, tool_input, cwd, model=MODEL)
         print(f"=== {name}: {tool} {list(tool_input)[:1]} ===")
         print("REQUEST:", json.dumps(body))
         if mock:

@@ -1,0 +1,10 @@
+# Copy to config.toml (gitignored) and fill in your provider's values.
+# Used by prototype/jev_contract.py for live provider tests.
+# Any provider works — hosted key, official console, or gateway route.
+
+[jev]
+# Hosted (default):       https://jevtypesafeai.com/api/v1/decide
+# Official TypeSafe:      https://console.typesafe.ai/v1/systemone
+url = "https://jevtypesafeai.com/api/v1/decide"
+api_key = "jv_live_xxx"
+model = "jev-latest"

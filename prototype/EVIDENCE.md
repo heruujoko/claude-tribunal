@@ -3,7 +3,9 @@
 **Question:** what exactly do we send to jev `/decide`, what exactly comes back, and
 does `choice` + `confidence` map cleanly to `allow`/`deny`/`ask`?
 
-**Run:** `python3 prototype/jev_contract.py` (live; `--mock` for documented-shape parse proof)
+**Run:** `python3 prototype/jev_contract.py` (live; `--mock` for documented-shape parse proof).
+Live creds: copy `config.toml.example` → `config.toml` (gitignored), fill `url` + `api_key`.
+Env vars `JEV_API_KEY` / `CCV_JEV_URL` override the file.
 
 ## Captured evidence (2026-09-22, live)
 
@@ -44,8 +46,9 @@ does `choice` + `confidence` map cleanly to `allow`/`deny`/`ask`?
 
 ## Open — needs a real key
 
-Live verdict evidence: run with `JEV_API_KEY=jv_live_… python3 prototype/jev_contract.py`
-and record below (expected: 200 + typed answers for the 4 cases; any non-200 shape).
+Live verdict evidence: fill `config.toml` (url + api_key), run
+`python3 prototype/jev_contract.py`, and record below (expected: 200 + typed answers for
+the 4 cases; any non-200 shape).
 
 ```
 <!-- paste live run here -->

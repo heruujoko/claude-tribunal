@@ -69,5 +69,10 @@ auth-runs-before-body-validation, and parse+map proven against the documented re
 Live verdicts pending a real API key. Baseline recorded; prototype deleted once the
 real implementation passes its tests.
 
+**12. Credentials for live tests.** `config.toml.example` committed; `config.toml`
+(gitignored, user-filled) holds the real provider `url` + `api_key` + `model`. The
+prototype reads it via stdlib `tomllib` (Python 3.13) — env vars still override. Keys
+never enter git.
+
 **Next (unwritten):** live-key verdict evidence → implement the plan → self-review →
 first working plugin install.
