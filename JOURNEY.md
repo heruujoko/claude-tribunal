@@ -74,5 +74,12 @@ real implementation passes its tests.
 prototype reads it via stdlib `tomllib` (Python 3.13) — env vars still override. Keys
 never enter git.
 
+**13. Cloudflare provider contract (user-supplied docs).** The "one decide shape
+everywhere" assumption was corrected: Cloudflare's `/ai/run` wraps `state`+`questions`
+inside `input`, uses model id `typesafe/jev`, and auths with a Cloudflare token — but
+`answers.*` is identical, so the mapping layer stays provider-independent. `usage` lacks
+cost fields there (billing = Cloudflare credits). Prototype now speaks both envelopes
+(`[jev] provider` in config.toml); evidence table added to EVIDENCE.md.
+
 **Next (unwritten):** live-key verdict evidence → implement the plan → self-review →
 first working plugin install.

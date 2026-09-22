@@ -44,11 +44,26 @@ Env vars `JEV_API_KEY` / `CCV_JEV_URL` override the file.
                    "human_ask": "uncertain, sensitive, or needing human judgment"}}}}
    ```
 
+## Provider envelopes (core contract shared, wrapper differs)
+
+| | hosted (jevtypesafeai.com) | cloudflare (/ai/run) |
+|---|---|---|
+| URL | `https://jevtypesafeai.com/api/v1/decide` | `https://api.cloudflare.com/client/v4/accounts/{id}/ai/run` |
+| Auth | `Bearer jv_live_…` | `Bearer CLOUDFLARE_API_TOKEN` |
+| Model | `jev-latest` / pinned | `typesafe/jev` |
+| Body | `{model, state, questions}` | `{model, input: {state, questions}}` |
+| Response | `answers.*` top-level | `answers.*` top-level — **identical** |
+| `usage` | tokens + `cost_usd` + `credits_remaining_usd` | tokens only (billed via Cloudflare credits) |
+
+Cloudflare contract captured 2026-09-22 from user-supplied docs (request wraps the same
+`state`+`questions` inside `input`; response shows a `choice` answer with `confidence`
+and `probabilities`, same as hosted). `map_answer` is provider-independent.
+
 ## Open — needs a real key
 
-Live verdict evidence: fill `config.toml` (url + api_key), run
-`python3 prototype/jev_contract.py`, and record below (expected: 200 + typed answers for
-the 4 cases; any non-200 shape).
+Live verdict evidence — pick a provider in `config.toml` (`[jev] provider`), fill its
+creds, run `python3 prototype/jev_contract.py`, and record below (expected: 200 + typed
+answers for the 4 cases on either provider; any non-200 shape).
 
 ```
 <!-- paste live run here -->

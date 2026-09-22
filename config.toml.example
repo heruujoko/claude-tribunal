@@ -1,10 +1,17 @@
 # Copy to config.toml (gitignored) and fill in your provider's values.
 # Used by prototype/jev_contract.py for live provider tests.
-# Any provider works — hosted key, official console, or gateway route.
 
+# provider: "hosted" (jevtypesafeai.com) or "cloudflare"
+# model:    "jev-latest" (or pinned "jev-1.13.0") on hosted;
+#           "typesafe/jev" when provider = "cloudflare"
 [jev]
-# Hosted (default):       https://jevtypesafeai.com/api/v1/decide
-# Official TypeSafe:      https://console.typesafe.ai/v1/systemone
-url = "https://jevtypesafeai.com/api/v1/decide"
-api_key = "jv_live_xxx"
+provider = "hosted"
+url = "https://jevtypesafeai.com/api/v1/decide"   # hosted route only
+api_key = "jv_live_xxx"                            # hosted route only (jv_live_…)
 model = "jev-latest"
+
+# cloudflare route: POST /client/v4/accounts/{account_id}/ai/run, model typesafe/jev
+# (wrangler whoami → account_id; wrangler auth token → api_token)
+[cloudflare]
+account_id = "your-cloudflare-account-id"
+api_token = "your-cloudflare-api-token"
