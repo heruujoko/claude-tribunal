@@ -27,6 +27,7 @@
 - **Jev decide API** (from jevtypesafeai.com/docs): `POST {CCV_JEV_URL}` with
   `Authorization: Bearer <key>`, body `{"model": "...", "state": <string|object>, "questions": {"verdict": {"type": "choice", "instructions": "...", "criteria": {"allowed": "...", "rejected": "...", "human_ask": "..."}}}}`.
   Response: `{"model": "...", "answers": {"verdict": {"type": "choice", "choice": "allowed", "confidence": 0.93, "probabilities": {...}}}, "usage": {...}}`.
+- **Cloudflare envelope (live-proven, 2026-09-22)**: on `/accounts/{id}/ai/run` the body wraps as `{"model": "typesafe/jev", "input": {state, questions}}` and the response nests: `{"result": {"state": "Completed", "result": {model, answers, usage}}, "success": true}` — `answers` is at `result.result.answers`, NOT top level. Both facts verified live in `prototype/EVIDENCE.md`.
 - All tests run with `python3 -m unittest discover -s tests -v` from the repo root.
 
 ---
@@ -265,6 +266,16 @@ class LoadConfigTests(unittest.TestCase):
         self.assertEqual(cfg["timeout"], 5)
         self.assertEqual(cfg["min_confidence"], 0.7)
 
+    def test_cloudflare_provider(self):
+        cfg = load_config(env={"CCV_PROVIDER": "cloudflare",
+                               "CLOUDFLARE_ACCOUNT_ID": "acc123",
+                               "CLOUDFLARE_API_TOKEN": "cf-token"})
+        self.assertEqual(cfg["provider"], "cloudflare")
+        self.assertEqual(cfg["jev_url"],
+                         "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run")
+        self.assertEqual(cfg["api_key"], "cf-token")
+        self.assertEqual(cfg["model"], "typesafe/jev")
+
     def test_config_file_replaces_rules(self):
         path = write_cfg({"safe_tools": ["Read"], "safe_commands": ["^ls$"]})
         try:
@@ -312,15 +323,24 @@ def _plugin_root():
 
 def load_config(env=None):
     env = os.environ if env is None else env
+    provider = env.get("CCV_PROVIDER", "hosted")
     cfg = {
-        "jev_url": env.get("CCV_JEV_URL", DEFAULT_JEV_URL),
-        "api_key": env.get("CCV_API_KEY", ""),
-        "model": env.get("CCV_MODEL", "jev-latest"),
+        "provider": provider,
+        "model": env.get("CCV_MODEL",
+                         "typesafe/jev" if provider == "cloudflare" else "jev-latest"),
         "timeout": int(env.get("CCV_TIMEOUT", "10")),
         "min_confidence": float(env.get("CCV_MIN_CONFIDENCE", "0.5")),
         "safe_tools": DEFAULT_SAFE_TOOLS,
         "safe_commands": DEFAULT_SAFE_COMMANDS,
     }
+    if provider == "cloudflare":
+        account = env.get("CLOUDFLARE_ACCOUNT_ID", "")
+        cfg["jev_url"] = (f"https://api.cloudflare.com/client/v4"
+                          f"/accounts/{account}/ai/run")
+        cfg["api_key"] = env.get("CLOUDFLARE_API_TOKEN", "")
+    else:
+        cfg["jev_url"] = env.get("CCV_JEV_URL", DEFAULT_JEV_URL)
+        cfg["api_key"] = env.get("CCV_API_KEY", "")
     path = env.get("CCV_CONFIG") or os.path.join(_plugin_root(), "config.json")
     if os.path.exists(path):
         with open(path) as f:
@@ -331,7 +351,7 @@ def load_config(env=None):
 **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest discover -s tests -v`
-Expected: 12 tests PASS (8 + 4)
+Expected: 14 tests PASS (8 + 6)
 
 **Step 5: Commit**
 
@@ -426,7 +446,7 @@ def evaluate(payload, cfg, post):
 **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest discover -s tests -v`
-Expected: 16 tests PASS
+Expected: 18 tests PASS (14 + 4)
 
 **Step 5: Commit**
 
@@ -481,6 +501,17 @@ class BuildRequestTests(unittest.TestCase):
         payload = {"tool_name": "Write", "tool_input": {"content": "A" * 20000}}
         self.assertLess(len(build_request(payload, CFG)["state"]["input"]), 8192 + 100)
         self.assertIn("[truncated]", build_request(payload, CFG)["state"]["input"])
+
+    def test_cloudflare_wraps_in_input(self):
+        cf_cfg = load_config(env={"CCV_PROVIDER": "cloudflare",
+                                  "CLOUDFLARE_ACCOUNT_ID": "acc123",
+                                  "CLOUDFLARE_API_TOKEN": "cf-token"})
+        payload = {"tool_name": "Bash", "tool_input": {"command": "ls"}, "cwd": "/t"}
+        body = build_request(payload, cf_cfg)
+        self.assertEqual(body["model"], "typesafe/jev")
+        self.assertNotIn("state", body)  # wrapped, not top-level
+        self.assertIn("state", body["input"])
+        self.assertIn("questions", body["input"])
 
 
 class EvaluateJevPathTests(unittest.TestCase):
@@ -551,6 +582,16 @@ class RealPostTests(unittest.TestCase):
             with self.assertRaises(KeyError):
                 real_post({"model": "jev-latest"}, CFG)
 
+    def test_cloudflare_envelope_unwrapped(self):
+        # exact live-captured shape (abridged): answers nested at result.result
+        cf_body = json.dumps({"result": {"state": "Completed", "result": {
+            "answers": {"verdict": {"choice": "rejected", "confidence": 0.99}}}},
+            "success": True, "errors": []}).encode()
+        with patch("hooks.validator.urllib.request.urlopen",
+                   return_value=io.BytesIO(cf_body)):
+            answer = real_post({"model": "typesafe/jev"}, CFG)
+        self.assertEqual(answer["choice"], "rejected")
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -582,8 +623,7 @@ def build_request(payload, cfg):
     raw = json.dumps(payload.get("tool_input", {}), default=str)
     if len(raw) > MAX_INPUT_BYTES:
         raw = raw[:MAX_INPUT_BYTES] + "...[truncated]"
-    return {
-        "model": cfg["model"],
+    core = {
         "state": {"cwd": payload.get("cwd", ""), "tool": tool, "input": raw},
         "questions": {
             "verdict": {
@@ -593,6 +633,19 @@ def build_request(payload, cfg):
             }
         },
     }
+    # Cloudflare /ai/run wraps state+questions inside "input" (live-proven envelope)
+    if cfg["provider"] == "cloudflare":
+        return {"model": cfg["model"], "input": core}
+    return {"model": cfg["model"], **core}
+
+
+def extract_answer(data):
+    """answers.verdict from either envelope: hosted top-level, Cloudflare nested
+    at result.result (discovered live 2026-09-22, see prototype/EVIDENCE.md)."""
+    inner = data.get("result")
+    if isinstance(inner, dict) and "result" in inner:
+        data = inner["result"]
+    return data["answers"]["verdict"]
 
 
 def real_post(body, cfg):
@@ -603,13 +656,13 @@ def real_post(body, cfg):
                                  headers=headers)
     with urllib.request.urlopen(req, timeout=cfg["timeout"]) as resp:
         data = json.load(resp)
-    return data["answers"]["verdict"]
+    return extract_answer(data)
 ```
 
 **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest discover -s tests -v`
-Expected: 25 tests PASS (16 + 9)
+Expected: 29 tests PASS (18 + 11)
 
 **Step 5: Commit**
 
@@ -709,7 +762,7 @@ if __name__ == "__main__":
 **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest discover -s tests -v`
-Expected: 28 tests PASS (25 + 3)
+Expected: 32 tests PASS (29 + 3)
 
 **Step 5: Commit**
 
@@ -751,7 +804,7 @@ Must cover:
 **Step 3: Run the full test suite**
 
 Run: `python3 -m unittest discover -s tests -v`
-Expected: 28 tests PASS, 0 failures
+Expected: 32 tests PASS, 0 failures
 
 **Step 4: Manual E2E sanity check (optional, needs a live key)**
 
@@ -772,5 +825,5 @@ git commit -m "docs: example rules config and plugin README"
 
 ## Final verification (whole plan)
 
-Run: `python3 -m unittest discover -s tests -v` → **28 passing tests**.
+Run: `python3 -m unittest discover -s tests -v` → **32 passing tests**.
 Then `git log --oneline` shows one commit per task.

@@ -31,7 +31,7 @@ Tiered evaluation, all in one stdlib-only Python script (`hooks/validator.py`, p
 1. **Fast path** — safe-tools list + safe-Bash-command regexes → `allow` with zero network. User-extensible via rules JSON.
 2. **Jev path** — one POST: `state` (cwd, tool, truncated ~8KB input) + a single `choice` question whose criteria are the three verdicts. `answers.verdict.choice` maps via dict lookup; `confidence < CCV_MIN_CONFIDENCE` → `ask`.
 
-Provider envelopes differ only in wrapping — Cloudflare nests `state`+`questions` inside `input`; the `answers` shape is identical, so parsing/mapping is provider-independent. Evidence: `prototype/EVIDENCE.md` (the wire-contract baseline, incl. live-captured error shapes).
+Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `prototype/EVIDENCE.md` (live-captured responses, verdicts, and per-call cost).
 
 Stdlib only (`json`, `os`, `re`, `sys`, `tomllib`, `urllib.request`) — no pip deps, by decision.
 

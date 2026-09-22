@@ -110,6 +110,17 @@ def live(body):
         return None, f"URLError: {e.reason}"
 
 
+def extract_answer(raw):
+    """Pull answers.verdict out of either envelope. Cloudflare /ai/run wraps the
+    model response: {result: {state, result: {answers…}}, success, errors} —
+    discovered live 2026-09-22; hosted returns answers at the top level."""
+    data = json.loads(raw)
+    inner = data.get("result")
+    if isinstance(inner, dict) and "result" in inner:
+        data = inner["result"]
+    return data["answers"]["verdict"]
+
+
 def main():
     mock = "--mock" in sys.argv
     key_ok = bool(KEY) and "dummy" not in KEY and "xxx" not in KEY
@@ -128,7 +139,7 @@ def main():
         raw = raw.replace(KEY, "***") if KEY else raw  # never echo creds if a server echoes them back
         print("RAW RESPONSE:", raw[:800])
         try:
-            answer = json.loads(raw)["answers"]["verdict"]
+            answer = extract_answer(raw)
             print("MAPPED DECISION:", map_answer(answer))
         except Exception as exc:
             print(f"MAPPED DECISION: n/a — parse failed ({exc!r}) → plugin exits "

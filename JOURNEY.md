@@ -101,5 +101,15 @@ credentials never exist on this repo's disk at all. Supersedes entries 12–14's
 config-file interface; the security posture improves from "gitignored file" to
 "no file".
 
-**Next (unwritten):** live-key verdict evidence → implement the plan → self-review →
-first working plugin install.
+**17. Live evidence day (the payoff of prototype-first).** First live run through
+Cloudflare (`/ai/run`, model `typesafe/jev`, HTTP 200 × 4) disproved the doc-shaped
+assumption: the real response nests `answers` at `result.result` inside a
+`{result, success, errors}` envelope — the prototype caught it by failing safe instead
+of mis-parsing. `extract_answer()` now unwraps both envelopes, verified against the
+exact captured payloads. Verdict quality on real cases: `git status`→allow (0.99),
+`curl|sh`→deny (0.99), force-push→ask (0.55), `/etc/hosts` write→ask with confidence
+0.37 — **the confidence gate caught a genuinely ambiguous call before the mapping did**.
+Measured cost: ~415 input tokens ≈ $0.00018/verdict. EVIDENCE.md closed; plan and PRD
+updated with the envelope contract (+4 tests, now 32).
+
+**Next (unwritten):** implement the plan → self-review → first working plugin install.

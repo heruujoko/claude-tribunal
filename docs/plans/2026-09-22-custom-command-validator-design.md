@@ -111,12 +111,20 @@ Environment variables:
 
 | Var | Purpose | Default |
 |---|---|---|
-| `CCV_JEV_URL` | jev decide endpoint (any provider) | `https://jevtypesafeai.com/api/v1/decide` |
-| `CCV_API_KEY` | Bearer key (`jv_live_…`) | required for jev path |
-| `CCV_MODEL` | `jev-latest` or pinned (e.g. `jev-1.13.0`) | `jev-latest` |
+| `CCV_PROVIDER` | `hosted` or `cloudflare` | `hosted` |
+| `CCV_JEV_URL` | jev decide endpoint (hosted route) | `https://jevtypesafeai.com/api/v1/decide` |
+| `CCV_API_KEY` | Bearer key (`jv_live_…`, hosted route) | required for jev path |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare route: derives `/ai/run` URL | — |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare route auth | — |
+| `CCV_MODEL` | Model id (cloudflare default: `typesafe/jev`) | `jev-latest` |
 | `CCV_TIMEOUT` | Request timeout (seconds) | `10` |
 | `CCV_MIN_CONFIDENCE` | Below this → `ask` | `0.5` |
 | `CCV_CONFIG` | Path to JSON rules file | plugin dir `config.json` |
+
+Credentials are env-only — no config file holds keys (decision 2026-09-22). Provider
+envelopes: cloudflare wraps the request in `input` and nests the response at
+`result.result` (live-proven, `prototype/EVIDENCE.md`); verdict mapping is
+provider-independent.
 
 Rules file defaults: safe tools = Read, Glob, Grep, TodoWrite, task tools; safe Bash
 commands = minimal read-only regex list (`git status|diff|log`, `ls`, `cat`, …),
