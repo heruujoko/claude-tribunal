@@ -3,7 +3,7 @@
 and what exactly comes back, and does choice+confidence map cleanly to
 allow/deny/ask on both envelopes?
 
-Run:  python3 prototype/jev_contract.py          # live calls (creds from config.toml)
+Run:  python3 prototype/jev_contract.py          # live calls (creds from env vars)
       python3 prototype/jev_contract.py --mock   # no network: parse documented shapes
 
 Providers (env-only, no config file — creds never touch this repo's disk):

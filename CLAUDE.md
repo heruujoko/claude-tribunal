@@ -17,7 +17,7 @@ A Claude Code **plugin** whose `PreToolUse` hook (matcher `*`) replaces auto mod
 ## Commands
 
 ```bash
-python3 prototype/jev_contract.py          # live wire-contract check (creds from config.toml)
+python3 prototype/jev_contract.py          # live wire-contract check (creds from env vars)
 python3 prototype/jev_contract.py --mock   # same, no network — parse/mapping proof
 python3 -m unittest discover -s tests -v   # full test suite (once hooks/ is implemented)
 ```
@@ -33,7 +33,7 @@ Tiered evaluation, all in one stdlib-only Python script (`hooks/validator.py`, p
 
 Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `prototype/EVIDENCE.md` (live-captured responses, verdicts, and per-call cost).
 
-Stdlib only (`json`, `os`, `re`, `sys`, `tomllib`, `urllib.request`) — no pip deps, by decision.
+Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no config-file credential path, by decision.
 
 ## Where things are
 
