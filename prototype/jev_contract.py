@@ -143,6 +143,7 @@ def main():
         else:
             status, raw = live(body)
         print(f"HTTP {status}")
+        raw = raw.replace(KEY, "***") if KEY else raw  # never echo creds if a server echoes them back
         print("RAW RESPONSE:", raw[:800])
         try:
             answer = json.loads(raw)["answers"]["verdict"]

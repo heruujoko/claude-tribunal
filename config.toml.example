@@ -7,6 +7,7 @@
 [jev]
 provider = "hosted"
 url = "https://jevtypesafeai.com/api/v1/decide"   # hosted route only
+# NEVER put a real key in THIS file — it is committed. Real values go in config.toml (gitignored).
 api_key = "jv_live_xxx"                            # hosted route only (jv_live_…)
 model = "jev-latest"
 
@@ -14,6 +15,7 @@ model = "jev-latest"
 # Keys mirror the env vars (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN) so config
 # and environment stay interchangeable. wrangler whoami → account id,
 # wrangler auth token → token.
+# NEVER put real values in THIS file — it is committed. Real values go in config.toml (gitignored).
 [cloudflare]
 CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"
 CLOUDFLARE_API_TOKEN = "your-cloudflare-api-token"
