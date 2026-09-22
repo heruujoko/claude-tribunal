@@ -94,5 +94,12 @@ New convention adopted at the same time (user decision): **a commit that changes
 behavior without a JOURNEY entry is incomplete** — the entry lands in the same commit
 as the change it describes. This entry is the first under that rule.
 
+**16. Env-only credentials (user decision, prototype scope).** `config.toml` and its
+example were deleted — the prototype reads **only env vars** (`CCV_PROVIDER`,
+`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `JEV_API_KEY`, `CCV_JEV_URL`), so real
+credentials never exist on this repo's disk at all. Supersedes entries 12–14's
+config-file interface; the security posture improves from "gitignored file" to
+"no file".
+
 **Next (unwritten):** live-key verdict evidence → implement the plan → self-review →
 first working plugin install.

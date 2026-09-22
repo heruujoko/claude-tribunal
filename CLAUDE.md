@@ -22,7 +22,7 @@ python3 prototype/jev_contract.py --mock   # same, no network — parse/mapping 
 python3 -m unittest discover -s tests -v   # full test suite (once hooks/ is implemented)
 ```
 
-Credentials live in `config.toml` (root) — **gitignored, never commit it or fill the committed `config.toml.example`**. Providers: `hosted` (jevtypesafeai.com decide API, `jv_live_…` key) or `cloudflare` (`/accounts/{id}/ai/run`, model `typesafe/jev`, CF token). Env vars override the file (`JEV_API_KEY`, `CCV_JEV_URL`, `CCV_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`).
+Credentials are **env-only for the prototype — nothing reads a config file, creds never touch this repo's disk**: `CCV_PROVIDER` (`hosted` default, or `cloudflare`), `JEV_API_KEY`/`CCV_JEV_URL` for hosted, `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_API_TOKEN` for cloudflare.
 
 ## Architecture
 

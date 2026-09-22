@@ -6,35 +6,19 @@ allow/deny/ask on both envelopes?
 Run:  python3 prototype/jev_contract.py          # live calls (creds from config.toml)
       python3 prototype/jev_contract.py --mock   # no network: parse documented shapes
 
-Providers (config.toml, [jev] provider=...):
-  hosted     — POST url {model, state, questions}, Bearer jv_live_…
-  cloudflare — POST /accounts/{id}/ai/run {model: "typesafe/jev", input: {state, questions}},
-               Bearer CLOUDFLARE_API_TOKEN (contract captured 2026-09-22, user-supplied docs)
+Providers (env-only, no config file — creds never touch this repo's disk):
+  hosted     — CCV_PROVIDER=hosted (default); CCV_JEV_URL, JEV_API_KEY (jv_live_…)
+  cloudflare — CCV_PROVIDER=cloudflare; CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN
 
 Evidence lands in prototype/EVIDENCE.md — the baseline for hooks/validator.py.
 """
 import json
 import os
 import sys
-import tomllib
 import urllib.error
 import urllib.request
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def _toml():
-    path = os.path.join(_ROOT, "config.toml")
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return tomllib.load(f)
-    return {}
-
-
-_T = _toml()
-_J = _T.get("jev", {})
-_CF = _T.get("cloudflare", {})
-PROVIDER = os.environ.get("CCV_PROVIDER", _J.get("provider", "hosted"))
+PROVIDER = os.environ.get("CCV_PROVIDER", "hosted")
 
 INSTRUCTIONS = (
     "Should an AI agent be allowed to run this tool call on the user's machine? "
@@ -55,16 +39,14 @@ def provider_config():
     """Returns (url, key, model, wrap) for the selected provider. wrap=True puts
     state+questions inside an `input` object (Cloudflare /ai/run shape)."""
     if PROVIDER == "cloudflare":
-        account = os.environ.get("CLOUDFLARE_ACCOUNT_ID",
-                                 _CF.get("CLOUDFLARE_ACCOUNT_ID", ""))
-        token = os.environ.get("CLOUDFLARE_API_TOKEN",
-                               _CF.get("CLOUDFLARE_API_TOKEN", ""))
+        account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+        token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
         url = (f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
                if account else "https://api.cloudflare.com/client/v4/accounts/MISSING/ai/run")
-        return url, token, _J.get("model", "typesafe/jev"), True
-    url = os.environ.get("CCV_JEV_URL", _J.get("url", "https://jevtypesafeai.com/api/v1/decide"))
-    key = os.environ.get("JEV_API_KEY", _J.get("api_key", "jv_live_prototype_dummy_key"))
-    return url, key, _J.get("model", "jev-latest"), False
+        return url, token, "typesafe/jev", True
+    url = os.environ.get("CCV_JEV_URL", "https://jevtypesafeai.com/api/v1/decide")
+    key = os.environ.get("JEV_API_KEY", "jv_live_prototype_dummy_key")
+    return url, key, "jev-latest", False
 
 
 URL, KEY, MODEL, WRAP = provider_config()
@@ -133,7 +115,7 @@ def main():
     key_ok = bool(KEY) and "dummy" not in KEY and "xxx" not in KEY
     print(f"PROTOTYPE jev contract  |  mode={'MOCK' if mock else 'LIVE'}"
           f"  |  provider={PROVIDER}  |  url={URL}  |  model={MODEL}  |  "
-          f"key={'set' if key_ok else 'MISSING — fill config.toml'}\n")
+          f"key={'set' if key_ok else 'MISSING — export provider env vars'}\n")
     for name, tool, tool_input, cwd in CASES:
         body = build_request(tool, tool_input, cwd)
         print(f"=== {name}: {tool} {list(tool_input)[:1]} ===")

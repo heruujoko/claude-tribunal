@@ -4,8 +4,9 @@
 does `choice` + `confidence` map cleanly to `allow`/`deny`/`ask`?
 
 **Run:** `python3 prototype/jev_contract.py` (live; `--mock` for documented-shape parse proof).
-Live creds: copy `config.toml.example` → `config.toml` (gitignored), fill `url` + `api_key`.
-Env vars `JEV_API_KEY` / `CCV_JEV_URL` override the file.
+Creds are **env-only** (never on disk in this repo): `CCV_PROVIDER=cloudflare` +
+`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, or default hosted with `JEV_API_KEY`
+(`CCV_JEV_URL` to override the endpoint).
 
 ## Captured evidence (2026-09-22, live)
 
@@ -61,9 +62,10 @@ and `probabilities`, same as hosted). `map_answer` is provider-independent.
 
 ## Open — needs a real key
 
-Live verdict evidence — pick a provider in `config.toml` (`[jev] provider`), fill its
-creds, run `python3 prototype/jev_contract.py`, and record below (expected: 200 + typed
-answers for the 4 cases on either provider; any non-200 shape).
+Live verdict evidence — export the provider's env vars (e.g. `CCV_PROVIDER=cloudflare`,
+`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`), run `python3 prototype/jev_contract.py`,
+and record below (expected: 200 + typed answers for the 4 cases on either provider; any
+non-200 shape).
 
 ```
 <!-- paste live run here -->
