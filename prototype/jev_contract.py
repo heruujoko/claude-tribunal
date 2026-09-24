@@ -5,6 +5,7 @@ allow/deny/ask on both envelopes?
 
 Run:  python3 prototype/jev_contract.py          # live calls (creds from env vars)
       python3 prototype/jev_contract.py --mock   # no network: parse documented shapes
+      python3 prototype/jev_contract.py --self-check  # assert both envelopes + fail-safe
 
 Providers (env-only, no config file — creds never touch this repo's disk):
   hosted     — CCV_PROVIDER=hosted (default); CCV_JEV_URL, JEV_API_KEY (jv_live_…)
@@ -13,6 +14,7 @@ Providers (env-only, no config file — creds never touch this repo's disk):
 Evidence lands in prototype/EVIDENCE.md — the baseline for hooks/validator.py.
 """
 import json
+import math
 import os
 import sys
 import urllib.error
@@ -44,6 +46,8 @@ def provider_config():
         url = (f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
                if account else "https://api.cloudflare.com/client/v4/accounts/MISSING/ai/run")
         return url, token, "typesafe/jev", True
+    if PROVIDER != "hosted":
+        raise ValueError("invalid CCV_PROVIDER")
     url = os.environ.get("CCV_JEV_URL", "https://jevtypesafeai.com/api/v1/decide")
     key = os.environ.get("JEV_API_KEY", "jv_live_prototype_dummy_key")
     return url, key, "jev-latest", False
@@ -65,11 +69,16 @@ def build_request(tool, tool_input, cwd):
 
 # The exact mapping the plugin will apply (identical for both providers).
 def map_answer(answer):
+    if not isinstance(answer, dict) or answer.get("type") != "choice":
+        return "ask (unusable answer)"
     decision = CHOICE_MAP.get(answer.get("choice"))
     if decision is None:
         return "ask (unusable answer)"
     conf = answer.get("confidence")
-    if conf is not None and conf < MIN_CONFIDENCE:
+    if (type(conf) not in (int, float) or not math.isfinite(conf)
+            or not 0 <= conf <= 1):
+        return "ask (invalid confidence)"
+    if conf < MIN_CONFIDENCE:
         return f"ask (confidence {conf} < {MIN_CONFIDENCE})"
     return decision
 
@@ -84,8 +93,7 @@ CASES = [
      {"file_path": "/etc/hosts", "content": "0.0.0.0 bank.example"}, "/"),
 ]
 
-# Documented response shape — used by --mock. Both providers return answers
-# at the top level; only usage contents differ (hosted adds cost fields).
+# Documented hosted response shape — Cloudflare wraps it at result.result.
 DOC_SHAPE = {
     "model": "jev-1.13.0",
     "answers": {
@@ -111,17 +119,41 @@ def live(body):
 
 
 def extract_answer(raw):
-    """Pull answers.verdict out of either envelope. Cloudflare /ai/run wraps the
-    model response: {result: {state, result: {answers…}}, success, errors} —
-    discovered live 2026-09-22; hosted returns answers at the top level."""
+    """Pull answers.verdict from the selected provider's successful envelope.
+    Cloudflare /ai/run nests the model response at result.result; hosted returns
+    answers at the top level. Never read a verdict from a failed envelope."""
     data = json.loads(raw)
-    inner = data.get("result")
-    if isinstance(inner, dict) and "result" in inner:
-        data = inner["result"]
+    if PROVIDER == "cloudflare":
+        if (data.get("success") is not True or data.get("errors") != []
+                or data.get("result", {}).get("state") != "Completed"):
+            raise ValueError("Cloudflare did not complete successfully")
+        data = data["result"]["result"]
     return data["answers"]["verdict"]
 
 
+def self_check():
+    answer = {"type": "choice", "choice": "allowed", "confidence": 0.99}
+    hosted = {"answers": {"verdict": answer}}
+    cloudflare = {"success": True, "errors": [], "result": {
+        "state": "Completed", "result": hosted}}
+    global PROVIDER
+    for PROVIDER, body in (("hosted", hosted), ("cloudflare", cloudflare)):
+        assert map_answer(extract_answer(json.dumps(body))) == "allow"
+    cloudflare["result"]["state"] = "Pending"
+    try:
+        extract_answer(json.dumps(cloudflare))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("pending Cloudflare response approved")
+    assert map_answer({"type": "choice", "choice": "allowed", "confidence": 0.2}).startswith("ask")
+    print("provider envelope self-check: ok")
+
+
 def main():
+    if "--self-check" in sys.argv:
+        self_check()
+        return
     mock = "--mock" in sys.argv
     key_ok = bool(KEY) and "dummy" not in KEY and "xxx" not in KEY
     print(f"PROTOTYPE jev contract  |  mode={'MOCK' if mock else 'LIVE'}"
@@ -132,18 +164,25 @@ def main():
         print(f"=== {name}: {tool} {list(tool_input)[:1]} ===")
         print("REQUEST:", json.dumps(body))
         if mock:
-            status, raw = 200, json.dumps(DOC_SHAPE)
+            response = ({"result": {"state": "Completed", "result": DOC_SHAPE},
+                         "success": True, "errors": []} if WRAP else DOC_SHAPE)
+            status, raw = 200, json.dumps(response)
         else:
+            if not key_ok or (PROVIDER == "cloudflare" and not os.environ.get("CLOUDFLARE_ACCOUNT_ID")):
+                print("MAPPED DECISION: ask (missing provider credentials)\n")
+                continue
             status, raw = live(body)
         print(f"HTTP {status}")
-        raw = raw.replace(KEY, "***") if KEY else raw  # never echo creds if a server echoes them back
-        print("RAW RESPONSE:", raw[:800])
         try:
+            if status != 200:
+                raise ValueError("provider HTTP failure")
             answer = extract_answer(raw)
+            print("ANSWER:", json.dumps({"type": answer.get("type"),
+                                         "choice": answer.get("choice"),
+                                         "confidence": answer.get("confidence")}))
             print("MAPPED DECISION:", map_answer(answer))
         except Exception as exc:
-            print(f"MAPPED DECISION: n/a — parse failed ({exc!r}) → plugin exits "
-                  f"non-blocking, native permission flow takes over")
+            print(f"MAPPED DECISION: ask (provider error: {type(exc).__name__})")
         print()
 
 

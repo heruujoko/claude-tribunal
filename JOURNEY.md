@@ -112,4 +112,23 @@ exact captured payloads. Verdict quality on real cases: `git status`→allow (0.
 Measured cost: ~415 input tokens ≈ $0.00018/verdict. EVIDENCE.md closed; plan and PRD
 updated with the envelope contract (+4 tests, now 32).
 
-**Next (unwritten):** implement the plan → self-review → first working plugin install.
+**18. Codex review day: the plan was the bug.** Two external reviews ran on the branch.
+Security pass (second round): clean, merge-safe, no credential leaks. Codex rescue:
+"do not merge yet" — and it was right. Four plan defects, all real after verification:
+(1) the Bash fast path used start-anchored regexes, so `git status; rm -rf /` would have
+been auto-allowed — the exact violation of the fail-safe invariant the project exists
+to enforce; (2) `JEV_API_KEY` (prototype, live-tested, user's shell) vs `CCV_API_KEY`
+(plan) drift; (3) `CCV_PROVIDER=typo` and missing Cloudflare account silently proceeded;
+(4) test-count arithmetic drifted from the listed tests. Fixes, all plan-level before
+any code exists: exact-string fast path restricted to built-ins (`git status`, `pwd`),
+rules file may only remove entries; `JEV_API_KEY` wins as the live-tested name; strict
+config validation with explicit `ask` for invalid provider/numerics/rules; Cloudflare
+responses must be `success: true` + `errors: []` + `state: "Completed"` before any
+verdict; confidence must be a finite number in [0, 1]; non-fast-path inputs over 8 KiB
+ask instead of truncating (a truncated view could hide a dangerous suffix — stricter
+than the review asked); counts machine-recounted (47) and a `--self-check` mode added
+to the prototype asserting the fail-safe paths. Pushback recorded: prototype's
+`git status` live verdict critique noted but moot for the wire-contract evidence.
+
+**Next (unwritten):** flip PR #1 ready → merge → implement the plan → self-review →
+first working plugin install.

@@ -19,6 +19,7 @@ A Claude Code **plugin** whose `PreToolUse` hook (matcher `*`) replaces auto mod
 ```bash
 python3 prototype/jev_contract.py          # live wire-contract check (creds from env vars)
 python3 prototype/jev_contract.py --mock   # same, no network — parse/mapping proof
+python3 prototype/jev_contract.py --self-check  # assert both envelopes + fail-safe
 python3 -m unittest discover -s tests -v   # full test suite (once hooks/ is implemented)
 ```
 
@@ -28,8 +29,8 @@ Credentials are **env-only for the prototype — nothing reads a config file, cr
 
 Tiered evaluation, all in one stdlib-only Python script (`hooks/validator.py`, per plan):
 
-1. **Fast path** — safe-tools list + safe-Bash-command regexes → `allow` with zero network. User-extensible via rules JSON.
-2. **Jev path** — one POST: `state` (cwd, tool, truncated ~8KB input) + a single `choice` question whose criteria are the three verdicts. `answers.verdict.choice` maps via dict lookup; `confidence < CCV_MIN_CONFIDENCE` → `ask`.
+1. **Fast path** — safe-tools list + exact built-in Bash commands (`git status`, `pwd`) → `allow` with zero network. Rules JSON can remove but not add built-in fast-path entries. Never prefix/regex-match Bash into auto-allow.
+2. **Jev path** — one POST: `state` (cwd, tool, input) + a single `choice` question whose criteria are the three verdicts. Inputs above 8 KiB go straight to `ask`; never approve based on a truncated view. `answers.verdict.choice` maps via dict lookup; missing/low/invalid confidence → `ask`.
 
 Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `prototype/EVIDENCE.md` (live-captured responses, verdicts, and per-call cost).
 

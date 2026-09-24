@@ -26,8 +26,10 @@ for one of exactly three verdicts:
 
 - **Jev only.** No generic OpenAI chat-completions backend. Output format is jev's typed
   Decision API, not parsed prose.
-- **Provider freedom via URL.** The plugin POSTs to `CCV_JEV_URL` (any jev decide
-  endpoint: hosted `/api/v1/decide`, official `/v1/systemone`, gateway route).
+- **Provider-specific transport.** Hosted jev uses `CCV_JEV_URL` (default `/api/v1/decide`);
+  Cloudflare uses its account-scoped `/ai/run` URL. Both share the typed `choice` question,
+  but the request and response envelopes differ. `JEV_API_KEY` is the hosted key name,
+  matching the live-tested prototype.
 - **Portable question shape.** A custom `choice` question (`allowed`/`rejected`/
   `human_ask` criteria) rather than the hosted-only `agent/risk` shortcut, so every
   provider works identically.
@@ -46,18 +48,22 @@ for one of exactly three verdicts:
 1. `PreToolUse` hook registered for all tools (`matcher: "*"`), exec form with
    `${CLAUDE_PLUGIN_ROOT}` path placeholder.
 2. **Tiered evaluation**:
-   - Fast path: configurable safe-tools list and safe-Bash-command regex list → `allow`
-     without any network call.
-   - Jev path: everything else → one `POST {CCV_JEV_URL}` decide call.
-3. **Jev request**: `{model, state: {cwd, tool, input (truncated ~8 KB)}, questions:
+   - Fast path: configurable safe-tools list and **exact** safe-Bash-command list →
+     `allow` without any network call. Compound commands, arguments not on the list,
+     and shell metacharacters reach jev; they never inherit a safe prefix's verdict.
+   - Jev path: everything else → one POST to the selected provider's endpoint.
+3. **Jev request**: `{model, state: {cwd, tool, input}, questions:
    {verdict: choice(allowed|rejected|human_ask)}}` — tool call only, no transcript.
+   Non-fast-path inputs over 8 KiB of UTF-8 JSON go to `ask` without a model call;
+   never classify a truncated view that could hide a dangerous suffix.
 4. **Verdict mapping**: `answers.verdict.choice` → allow/deny/ask.
    `confidence < CCV_MIN_CONFIDENCE` → `ask`. Unusable/missing answer → `ask`.
    There is no free-text parsing — the answer type is fixed by the request.
-5. Fail-to-human: unreachable endpoint, timeout, non-200, or missing API key → fall
-   through to Claude Code's native permission flow (hook exits non-blocking). The hook
-   may only tighten permissions, never loosen them. (Verified against live docs:
-   hook `ask` forces the prompt even in auto mode.)
+5. Fail-to-human: unreachable endpoint, timeout, non-200, invalid provider/config,
+   missing credentials, failed Cloudflare status, or unusable answer → explicit `ask`
+   when possible. Unexpected hook crashes exit non-blocking and leave Claude Code's
+   native permission flow in charge. The hook must never emit `allow` for a failure.
+   (Verified against live docs: hook `ask` forces the prompt even in auto mode.)
 6. Plugin packaging (`.claude-plugin/plugin.json` + local marketplace manifest),
    installed via `/plugin marketplace add <repo>` + `/plugin install`.
 
@@ -100,10 +106,11 @@ config.example.json              # safe-tools / safe-commands example rules
 
 | Situation | Behavior |
 |---|---|
-| Endpoint unreachable / timeout / non-200 | non-blocking exit → native permission flow |
-| Missing/invalid answer shape | `ask` |
-| `CCV_API_KEY` unset | `ask` |
-| validator.py crashes | non-blocking exit → native permission flow unchanged |
+| Endpoint unreachable / timeout / non-200 | `ask` when caught; unexpected crash → native flow |
+| Missing/invalid answer shape or unsuccessful Cloudflare envelope | `ask` |
+| Missing `JEV_API_KEY` or Cloudflare account/token | `ask` before network |
+| Invalid provider, numeric setting, or rules file | `ask` before network |
+| validator.py crashes unexpectedly | non-blocking exit → native flow unchanged |
 
 ### Configuration
 
@@ -113,7 +120,7 @@ Environment variables:
 |---|---|---|
 | `CCV_PROVIDER` | `hosted` or `cloudflare` | `hosted` |
 | `CCV_JEV_URL` | jev decide endpoint (hosted route) | `https://jevtypesafeai.com/api/v1/decide` |
-| `CCV_API_KEY` | Bearer key (`jv_live_…`, hosted route) | required for jev path |
+| `JEV_API_KEY` | Bearer key (`jv_live_…`, hosted route) | required for hosted calls |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare route: derives `/ai/run` URL | — |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare route auth | — |
 | `CCV_MODEL` | Model id (cloudflare default: `typesafe/jev`) | `jev-latest` |
@@ -127,8 +134,10 @@ envelopes: cloudflare wraps the request in `input` and nests the response at
 provider-independent.
 
 Rules file defaults: safe tools = Read, Glob, Grep, TodoWrite, task tools; safe Bash
-commands = minimal read-only regex list (`git status|diff|log`, `ls`, `cat`, …),
-user-extendable.
+commands = only exact `git status` and `pwd`. The rules file may only remove built-in
+fast-path tool/command entries. Adding any auto-allow requires a reviewed code change;
+exact strings alone cannot make arbitrary commands safe. Regex/prefix matching must
+never auto-allow a command suffix.
 
 ## Testing
 
