@@ -16,6 +16,15 @@ DEFAULT_JEV_URL = "https://jevtypesafeai.com/api/v1/decide"
 DEFAULT_SAFE_TOOLS = ["Read", "Glob", "Grep", "TodoWrite",
                       "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 DEFAULT_SAFE_COMMANDS = ["git status", "pwd"]
+VERDICT_INSTRUCTIONS = (
+    "Should an AI agent be allowed to run this tool call on the user's machine? "
+    "Pick human_ask when uncertain or when a human should decide."
+)
+VERDICT_CRITERIA = {
+    "allowed": "clearly safe and reversible for this machine",
+    "rejected": "clearly unsafe, destructive, or against the user's interest",
+    "human_ask": "uncertain, sensitive, or needing human judgment",
+}
 
 
 def _plugin_root():
@@ -87,7 +96,49 @@ def map_answer(answer, min_confidence):
 
 
 def build_request(payload, cfg):
-    return {}  # replaced by the jev request in Task 5
+    tool = payload.get("tool_name", "")
+    raw = json.dumps(payload.get("tool_input", {}), default=str, ensure_ascii=False)
+    if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
+        raise ValueError("tool input exceeds validator budget")
+    # evaluate() returns ask before calling this builder when the input is too large.
+    core = {
+        "state": {"cwd": payload.get("cwd", ""), "tool": tool, "input": raw},
+        "questions": {
+            "verdict": {
+                "type": "choice",
+                "instructions": VERDICT_INSTRUCTIONS,
+                "criteria": VERDICT_CRITERIA,
+            }
+        },
+    }
+    # Cloudflare /ai/run wraps state+questions inside "input" (live-proven envelope)
+    if cfg["provider"] == "cloudflare":
+        return {"model": cfg["model"], "input": core}
+    return {"model": cfg["model"], **core}
+
+
+def extract_answer(data, provider):
+    """Only completed, error-free Cloudflare responses can yield a verdict.
+
+    Cloudflare's nested envelope was captured live in prototype/EVIDENCE.md.
+    """
+    if provider == "cloudflare":
+        if (data.get("success") is not True or data.get("errors") != []
+                or data.get("result", {}).get("state") != "Completed"):
+            raise ValueError("Cloudflare did not complete successfully")
+        data = data["result"]["result"]
+    return data["answers"]["verdict"]
+
+
+def real_post(body, cfg):
+    headers = {"Content-Type": "application/json"}
+    if cfg["api_key"]:
+        headers["Authorization"] = f"Bearer {cfg['api_key']}"
+    req = urllib.request.Request(cfg["jev_url"], data=json.dumps(body).encode(),
+                                 headers=headers)
+    with urllib.request.urlopen(req, timeout=cfg["timeout"]) as resp:
+        data = json.load(resp)
+    return extract_answer(data, cfg["provider"])
 
 
 def evaluate(payload, cfg, post):
