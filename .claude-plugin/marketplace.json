@@ -1,0 +1,11 @@
+{
+  "name": "local-dev",
+  "owner": {"name": "herujokoutomo"},
+  "plugins": [
+    {
+      "name": "custom-command-validator",
+      "source": ".",
+      "description": "jev-backed permission validator for Claude Code tool calls"
+    }
+  ]
+}

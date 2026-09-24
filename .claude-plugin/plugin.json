@@ -1,0 +1,5 @@
+{
+  "name": "custom-command-validator",
+  "description": "Routes every tool call through a jev typed-decision model for allowed/rejected/human_ask verdicts",
+  "version": "0.1.0"
+}
