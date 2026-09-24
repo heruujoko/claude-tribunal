@@ -84,3 +84,30 @@ def map_answer(answer, min_confidence):
             or not 0 <= confidence <= 1 or confidence < min_confidence):
         return "ask"
     return decision
+
+
+def build_request(payload, cfg):
+    return {}  # replaced by the jev request in Task 5
+
+
+def evaluate(payload, cfg, post):
+    """Tool-call payload -> (permissionDecision, reason). post(body, cfg) -> answers.verdict."""
+    tool = payload.get("tool_name", "")
+    if tool in cfg["safe_tools"]:
+        return "allow", "fast path: safe tool"
+    if tool == "Bash":
+        cmd = (payload.get("tool_input") or {}).get("command", "")
+        if cmd in cfg["safe_commands"]:
+            return "allow", "fast path: safe command"
+    raw = json.dumps(payload.get("tool_input", {}), default=str, ensure_ascii=False)
+    if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
+        return "ask", "tool input exceeds validator budget"
+    if not cfg["api_key"]:
+        return "ask", "provider API key not set"
+    answer = post(build_request(payload, cfg), cfg)
+    decision = map_answer(answer, cfg["min_confidence"])
+    if decision is None:
+        return "ask", "unusable jev answer"
+    choice = answer.get("choice")
+    confidence = answer.get("confidence")
+    return decision, f"jev: {choice} (confidence {confidence})"
