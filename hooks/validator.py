@@ -6,10 +6,66 @@ non-blocking (exit 1) so Claude Code's native permission flow stays in charge.
 """
 import json
 import math
+import os
 import sys
+import urllib.request
 
 CHOICE_MAP = {"allowed": "allow", "rejected": "deny", "human_ask": "ask"}
 MAX_INPUT_BYTES = 8192
+DEFAULT_JEV_URL = "https://jevtypesafeai.com/api/v1/decide"
+DEFAULT_SAFE_TOOLS = ["Read", "Glob", "Grep", "TodoWrite",
+                      "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+DEFAULT_SAFE_COMMANDS = ["git status", "pwd"]
+
+
+def _plugin_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def load_config(env=None):
+    env = os.environ if env is None else env
+    provider = env.get("CCV_PROVIDER", "hosted")
+    if provider not in ("hosted", "cloudflare"):
+        raise ValueError("invalid CCV_PROVIDER")
+    try:
+        timeout = int(env.get("CCV_TIMEOUT", "10"))
+        confidence = float(env.get("CCV_MIN_CONFIDENCE", "0.5"))
+    except ValueError as exc:
+        raise ValueError("invalid numeric setting") from exc
+    if timeout <= 0 or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        raise ValueError("invalid timeout or confidence threshold")
+    cfg = {
+        "provider": provider,
+        "model": env.get("CCV_MODEL",
+                         "typesafe/jev" if provider == "cloudflare" else "jev-latest"),
+        "timeout": timeout,
+        "min_confidence": confidence,
+        "safe_tools": DEFAULT_SAFE_TOOLS,
+        "safe_commands": DEFAULT_SAFE_COMMANDS,
+    }
+    if provider == "cloudflare":
+        account = env.get("CLOUDFLARE_ACCOUNT_ID", "")
+        if not account or not account.isalnum():
+            raise ValueError("invalid CLOUDFLARE_ACCOUNT_ID")
+        cfg["jev_url"] = (f"https://api.cloudflare.com/client/v4"
+                          f"/accounts/{account}/ai/run")
+        cfg["api_key"] = env.get("CLOUDFLARE_API_TOKEN", "")
+    else:
+        cfg["jev_url"] = env.get("CCV_JEV_URL", DEFAULT_JEV_URL)
+        cfg["api_key"] = env.get("JEV_API_KEY", "")
+    path = env.get("CCV_CONFIG") or os.path.join(_plugin_root(), "config.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            rules = json.load(f)
+        if not isinstance(rules, dict) or set(rules) - {"safe_tools", "safe_commands"}:
+            raise ValueError("rules file may only replace safe_tools and safe_commands")
+        for key, values in rules.items():
+            defaults = DEFAULT_SAFE_TOOLS if key == "safe_tools" else DEFAULT_SAFE_COMMANDS
+            if (not isinstance(values, list) or not all(isinstance(v, str) for v in values)
+                    or any(v not in defaults for v in values)):
+                raise ValueError(f"invalid {key} fast-path rules")
+        cfg.update(rules)
+    return cfg
 
 
 def map_answer(answer, min_confidence):
