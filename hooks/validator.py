@@ -162,3 +162,34 @@ def evaluate(payload, cfg, post):
     choice = answer.get("choice")
     confidence = answer.get("confidence")
     return decision, f"jev: {choice} (confidence {confidence})"
+
+
+def emit(decision, reason=""):
+    json.dump({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": decision,
+        "permissionDecisionReason": reason,
+    }}, sys.stdout)
+    sys.stdout.write("\n")
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except Exception as exc:
+        print(f"validator: {type(exc).__name__}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        decision, reason = evaluate(payload, load_config(), real_post)
+        emit(decision, reason)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        # Known config/provider/transport errors should force a human prompt.
+        emit("ask", f"validator unavailable: {type(exc).__name__}")
+    except Exception as exc:  # unexpected failure: native permissions remain in charge
+        print(f"validator: {type(exc).__name__}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
