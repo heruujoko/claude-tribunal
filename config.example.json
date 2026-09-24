@@ -1,0 +1,4 @@
+{
+  "safe_tools": ["Read", "Glob", "Grep", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"],
+  "safe_commands": ["git status", "pwd"]
+}
