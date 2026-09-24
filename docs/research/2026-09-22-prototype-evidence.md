@@ -3,10 +3,12 @@
 **Question:** what exactly do we send to jev `/decide`, what exactly comes back, and
 does `choice` + `confidence` map cleanly to `allow`/`deny`/`ask`?
 
-**Run:** `python3 prototype/jev_contract.py` (live; `--mock` for documented-shape parse proof).
-Creds are **env-only** (never on disk in this repo): `CCV_PROVIDER=cloudflare` +
-`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, or default hosted with `JEV_API_KEY`
-(`CCV_JEV_URL` to override the endpoint).
+**Status: archived.** The throwaway prototype was removed after the production hook
+passed all 47 unit tests. This document preserves the live wire-contract evidence;
+use `python3 -m unittest discover -s tests -v` for current behavior. Credentials are
+env-only: `CCV_PROVIDER=cloudflare` + `CLOUDFLARE_ACCOUNT_ID` +
+`CLOUDFLARE_API_TOKEN`, or default hosted with `JEV_API_KEY` (`CCV_JEV_URL` overrides
+the hosted endpoint).
 
 ## Captured evidence (2026-09-22, live)
 
@@ -92,8 +94,7 @@ calls, not just vetoing bad parses.
 
 ## Verdict
 
-Contract is implementation-ready **and live-proven**: request shape final (both
-envelopes), verdict quality validated on real cases, cost per call measured, confidence
-gate exercised. Envelope unwrap (`extract_answer`) must be replicated in
-`hooks/validator.py`. Delete this prototype once the real implementation passes its
-tests.
+Contract was **live-proven and implemented**: request shape for both envelopes,
+verdict quality on real cases, cost per call, and confidence gate. The hook's
+`extract_answer()` lives in `hooks/validator.py`; 47 tests cover its behavior. The
+throwaway prototype was deleted after those tests passed.

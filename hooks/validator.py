@@ -120,7 +120,8 @@ def build_request(payload, cfg):
 def extract_answer(data, provider):
     """Only completed, error-free Cloudflare responses can yield a verdict.
 
-    Cloudflare's nested envelope was captured live in prototype/EVIDENCE.md.
+    Cloudflare's nested envelope was captured live (docs/research/
+    2026-09-22-prototype-evidence.md).
     """
     if provider == "cloudflare":
         if (data.get("success") is not True or data.get("errors") != []

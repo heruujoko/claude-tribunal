@@ -130,5 +130,27 @@ than the review asked); counts machine-recounted (47) and a `--self-check` mode 
 to the prototype asserting the fail-safe paths. Pushback recorded: prototype's
 `git status` live verdict critique noted but moot for the wire-contract evidence.
 
-**Next (unwritten):** flip PR #1 ready → merge → implement the plan → self-review →
-first working plugin install.
+## 2026-09-24 — First implementation
+
+**19. Research merged, implementation isolated on a branch.** PR #1 merged into
+`main` at `5aaf26e`; `feature/implement-validator` began from that commit. The
+approved seven-task plan was executed test-first in seven commits. The Python stdlib
+hook now registers for every `PreToolUse` event, permits only the reviewed fast-path
+entries without network, sends other eligible calls to hosted jev or Cloudflare, and
+maps a typed answer to `allow`, `deny`, or `ask`. Missing credentials, oversized input,
+invalid configuration, failed transport, bad provider envelopes, and unusable/low-
+confidence answers cannot become auto-allow.
+
+**20. Main-thread verification and prototype retirement.** The executor reported 47
+passing tests; a separate main-thread run confirmed 47/47. Direct hook smoke checks
+confirmed `Read`→`allow` and `git status; rm -rf /`→`ask` when no model key is set.
+`claude plugin validate .` passed with two non-blocking metadata warnings (marketplace
+description and plugin author). The throwaway prototype was removed, as promised from
+day one; its live Cloudflare response and verdict baseline was moved to
+`docs/research/2026-09-22-prototype-evidence.md`. One deliberate correction to the
+plan's sample code: malformed stdin exits non-blocking before config evaluation, as
+the plan's own subprocess test required. No live provider call was made during this
+implementation verification; network integration remains to be checked on install.
+
+**Next (unwritten):** install/test the plugin with a live provider, then decide
+whether to push/open the implementation PR.

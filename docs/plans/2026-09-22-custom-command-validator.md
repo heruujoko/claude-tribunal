@@ -27,7 +27,7 @@
 - **Jev decide API** (from jevtypesafeai.com/docs): `POST {CCV_JEV_URL}` with
   `Authorization: Bearer <key>`, body `{"model": "...", "state": <string|object>, "questions": {"verdict": {"type": "choice", "instructions": "...", "criteria": {"allowed": "...", "rejected": "...", "human_ask": "..."}}}}`.
   Response: `{"model": "...", "answers": {"verdict": {"type": "choice", "choice": "allowed", "confidence": 0.93, "probabilities": {...}}}, "usage": {...}}`.
-- **Cloudflare envelope (live-proven, 2026-09-22)**: on `/accounts/{id}/ai/run` the body wraps as `{"model": "typesafe/jev", "input": {state, questions}}` and the response nests: `{"result": {"state": "Completed", "result": {model, answers, usage}}, "success": true}` — `answers` is at `result.result.answers`, NOT top level. Both facts verified live in `prototype/EVIDENCE.md`.
+- **Cloudflare envelope (live-proven, 2026-09-22)**: on `/accounts/{id}/ai/run` the body wraps as `{"model": "typesafe/jev", "input": {state, questions}}` and the response nests: `{"result": {"state": "Completed", "result": {model, answers, usage}}, "success": true}` — `answers` is at `result.result.answers`, NOT top level. Both facts verified live in `docs/research/2026-09-22-prototype-evidence.md`.
 - All tests run with `python3 -m unittest discover -s tests -v` from the repo root.
 
 ---
@@ -752,7 +752,7 @@ def build_request(payload, cfg):
 def extract_answer(data, provider):
     """Only completed, error-free Cloudflare responses can yield a verdict.
 
-    Cloudflare's nested envelope was captured live in prototype/EVIDENCE.md.
+    Cloudflare's nested envelope was captured live in docs/research/2026-09-22-prototype-evidence.md.
     """
     if provider == "cloudflare":
         if (data.get("success") is not True or data.get("errors") != []
