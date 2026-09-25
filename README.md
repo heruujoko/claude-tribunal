@@ -25,6 +25,21 @@ Install from a local clone using the plugin marketplace:
 /plugin install custom-command-validator@local-dev
 ```
 
+## Initial setup (Cloudflare provider)
+
+The plugin bundles a setup skill that detects your OS and shell and shows the exact
+lines for your profile (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, or fish config):
+
+```
+/custom-command-validator:setup-cloudflare
+```
+
+It sets `CCV_PROVIDER=cloudflare`, `CLOUDFLARE_ACCOUNT_ID`, and
+`CLOUDFLARE_API_TOKEN` persistently in your shell profile. The skill never reads,
+receives, or writes your token — you edit the profile yourself, and it only verifies
+`set`/`MISSING` per variable. Note the token lives in plaintext in the profile.
+macOS and Linux only (zsh, bash, fish).
+
 ## Environment Variables & Configuration
 
 Credentials are env-only — they are never read from disk.
