@@ -163,5 +163,14 @@ Combined behavior "1+2": guide plus persistence in the user's own shell profile;
 the skill never sees the token, so it cannot leak it. Plaintext-in-profile
 trade-off is stated during setup. No hook or test changes.
 
-**Next (unwritten):** implement the setup skill, then install the plugin with a
-live provider and open the implementation PR.
+**22. Setup skill implemented.** `skills/setup-cloudflare/SKILL.md` landed in two
+commits (6097dcf, e3aab9f): `/custom-command-validator:setup-cloudflare` detects
+macOS/Linux + zsh/bash/fish, prints the exact profile lines with placeholders,
+points at the Cloudflare dashboard (wrangler optional), and verifies set/MISSING
+only — Claude executing the skill can never receive the token. Main-thread
+verification: 47 tests OK, `claude plugin validate` passed (same two pre-existing
+metadata warnings), content reviewed verbatim against the plan, grep for
+credential-capture commands clean.
+
+**Next (unwritten):** install the plugin with a live provider, then push and open
+the implementation PR.
