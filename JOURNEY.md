@@ -152,5 +152,16 @@ plan's sample code: malformed stdin exits non-blocking before config evaluation,
 the plan's own subprocess test required. No live provider call was made during this
 implementation verification; network integration remains to be checked on install.
 
-**Next (unwritten):** install/test the plugin with a live provider, then decide
-whether to push/open the implementation PR.
+## 2026-09-24 — Setup skill design
+
+**21. Bundled setup skill (user request, same branch).** "Help users set the
+Cloudflare keys by invoking a skill provided by the plugin." Design decision after
+clarification: documentation-only skill at `skills/setup-cloudflare/SKILL.md` —
+detects OS + shell (macOS/Linux; zsh/bash/fish; Windows unsupported), prints the
+exact profile lines with placeholders, and verifies with set/MISSING output only.
+Combined behavior "1+2": guide plus persistence in the user's own shell profile;
+the skill never sees the token, so it cannot leak it. Plaintext-in-profile
+trade-off is stated during setup. No hook or test changes.
+
+**Next (unwritten):** implement the setup skill, then install the plugin with a
+live provider and open the implementation PR.
