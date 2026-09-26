@@ -1,7 +1,12 @@
+import contextlib
+import io
 import json
 import os
 import subprocess
 import unittest
+from unittest.mock import patch
+
+from hooks import validator
 
 SCRIPT = "hooks/validator.py"
 
@@ -74,6 +79,46 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertEqual(json.loads(proc.stdout)["hookSpecificOutput"]
                          ["permissionDecision"], "ask")
+
+    def test_malformed_cloudflare_envelopes_ask(self):
+        cfg = validator.load_config(env={
+            "CCV_PROVIDER": "cloudflare", "CLOUDFLARE_ACCOUNT_ID": "acc123",
+            "CLOUDFLARE_API_TOKEN": "dummy-token", "CCV_CONFIG": "/nonexistent.json",
+        })
+        malformed = (None, [], "invalid", 42)
+        bodies = list(malformed)
+        bodies.extend({"success": True, "errors": [], "result": value}
+                      for value in malformed)
+        bodies.extend({"success": True, "errors": [], "result": {
+            "state": "Completed", "result": value}} for value in malformed)
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}})
+        for body in bodies:
+            with self.subTest(body=body):
+                out, err = io.StringIO(), io.StringIO()
+                with patch.object(validator, "load_config", return_value=cfg), \
+                        patch.object(validator.sys, "stdin", io.StringIO(payload)), \
+                        patch.object(validator.urllib.request, "urlopen",
+                                     return_value=io.BytesIO(json.dumps(body).encode())), \
+                        contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    validator.main()  # Must return normally, not exit nonblocking.
+                self.assertEqual(err.getvalue(), "")
+                self.assertEqual(len(out.getvalue().splitlines()), 1)
+                result = json.loads(out.getvalue())["hookSpecificOutput"]
+                self.assertEqual(result["hookEventName"], "PreToolUse")
+                self.assertEqual(result["permissionDecision"], "ask")
+                self.assertNotIn("dummy-token", out.getvalue())
+
+    def test_unexpected_internal_failure_exits_nonblocking(self):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}})
+        out, err = io.StringIO(), io.StringIO()
+        with patch.object(validator.sys, "stdin", io.StringIO(payload)), \
+                patch.object(validator, "load_config", side_effect=RuntimeError("internal")), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            with self.assertRaises(SystemExit) as raised:
+                validator.main()
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue(), "validator: RuntimeError\n")
 
     def test_malformed_rules_file_asks(self):
         import tempfile

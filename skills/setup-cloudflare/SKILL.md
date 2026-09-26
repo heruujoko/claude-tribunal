@@ -70,7 +70,7 @@ Give the user this check — it prints set/MISSING per variable, never values:
 
     python3 -c 'import os
 for v in ("CCV_PROVIDER", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"):
-    print(f"{v}: {'set' if os.environ.get(v) else 'MISSING'}")'
+    print("{}: {}".format(v, "set" if os.environ.get(v) else "MISSING"))'
 
 All three `set` → done. Any `MISSING` → the profile was not sourced or the
 lines were not added; go back to Step 2.

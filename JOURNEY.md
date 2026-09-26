@@ -172,5 +172,32 @@ verification: 47 tests OK, `claude plugin validate` passed (same two pre-existin
 metadata warnings), content reviewed verbatim against the plan, grep for
 credential-capture commands clean.
 
-**Next (unwritten):** install the plugin with a live provider, then push and open
-the implementation PR.
+## 2026-09-26 — PR #2 review fixes
+
+**23. Two reproduced regressions fixed before live setup.** Main-thread review of
+PR #2 found that malformed Cloudflare JSON (`null` or a non-object `result`)
+raised `AttributeError` and resumed native permissions rather than forcing `ask`.
+Explicit envelope type checks now route those responses through the existing
+known-error path. Regression coverage exercises twelve malformed envelope shapes
+through `main()` and separately preserves non-blocking behavior for genuinely
+unexpected internal failures.
+
+The bundled setup check also mixed shell and Python single quotes: missing vars
+raised `NameError`, while present vars printed `<class 'set'>`. Its status output
+now uses shell-safe quoting. Tests extract the actual skill snippet and execute
+absent, present, and mixed dummy environments without inheriting credentials.
+Both defects were reproduced by failing tests before the fixes. Main-thread final
+verification: 52 tests, 50 passed and 2 skipped (zsh/fish unavailable); marketplace
+validation passed with the same two metadata warnings. No live provider calls or
+credentials were used. The requested subagent implementation used the prescribed
+main-thread fallback because the available Agent tool requires isolation, contrary
+to this project's shared-checkout-only policy.
+
+**24. Local acceptance plan retained.**
+`docs/plans/2026-09-26-pr-2-local-test-plan.md` records the original review evidence,
+regression results, private credential setup, bounded live classification, and
+installed-plugin checks. Direct Python tests do not prove hook registration or
+actual prompt/deny behavior inside Claude Code. Live tests remain pending.
+
+**Next:** user-controlled token setup, then approved live and installed-plugin
+checks. This fix commit does not push, post to GitHub, or merge PR #2.

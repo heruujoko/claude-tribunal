@@ -124,8 +124,10 @@ def extract_answer(data, provider):
     2026-09-22-prototype-evidence.md).
     """
     if provider == "cloudflare":
+        if not isinstance(data, dict) or not isinstance(data.get("result"), dict):
+            raise ValueError("invalid Cloudflare envelope")
         if (data.get("success") is not True or data.get("errors") != []
-                or data.get("result", {}).get("state") != "Completed"):
+                or data["result"].get("state") != "Completed"):
             raise ValueError("Cloudflare did not complete successfully")
         data = data["result"]["result"]
     return data["answers"]["verdict"]
