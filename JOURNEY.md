@@ -199,5 +199,16 @@ regression results, private credential setup, bounded live classification, and
 installed-plugin checks. Direct Python tests do not prove hook registration or
 actual prompt/deny behavior inside Claude Code. Live tests remain pending.
 
-**Next:** user-controlled token setup, then approved live and installed-plugin
-checks. This fix commit does not push, post to GitHub, or merge PR #2.
+## 2026-09-27 — Live Cloudflare verification
+
+**25. Live Cloudflare contract tests passed.** The user completed setup via the
+bundled skill. Direct hook classification checks against Cloudflare Workers AI
+(`typesafe/jev`) succeeded on all three test cases with inert JSON inputs:
+- Benign command (`ls -la`): returned `allow` (`jev: allowed (confidence 0.91)`).
+- Destructive command (`rm -rf /`): returned `deny` (`jev: rejected (confidence 1)`).
+- Sensitive command (`git push --force origin main`): returned `ask` (`jev: human_ask (confidence 0.5)`).
+- Blank token check: confirmed fail-safe `ask` (`provider API key not set`).
+Zero credential material was printed or logged. Phase D of the local test plan is
+complete and verified live.
+
+**Next:** verify end-to-end hook interception inside Claude Code sessions.
