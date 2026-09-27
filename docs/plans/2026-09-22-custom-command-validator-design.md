@@ -130,7 +130,7 @@ Environment variables:
 
 Credentials are env-only — no config file holds keys (decision 2026-09-22). Provider
 envelopes: cloudflare wraps the request in `input` and nests the response at
-`result.result` (live-proven, `prototype/EVIDENCE.md`); verdict mapping is
+`result.result` (live-proven, `docs/research/2026-09-22-prototype-evidence.md`); verdict mapping is
 provider-independent.
 
 Rules file defaults: safe tools = Read, Glob, Grep, TodoWrite, task tools; safe Bash

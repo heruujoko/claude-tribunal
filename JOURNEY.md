@@ -130,5 +130,85 @@ than the review asked); counts machine-recounted (47) and a `--self-check` mode 
 to the prototype asserting the fail-safe paths. Pushback recorded: prototype's
 `git status` live verdict critique noted but moot for the wire-contract evidence.
 
-**Next (unwritten):** flip PR #1 ready → merge → implement the plan → self-review →
-first working plugin install.
+## 2026-09-24 — First implementation
+
+**19. Research merged, implementation isolated on a branch.** PR #1 merged into
+`main` at `5aaf26e`; `feature/implement-validator` began from that commit. The
+approved seven-task plan was executed test-first in seven commits. The Python stdlib
+hook now registers for every `PreToolUse` event, permits only the reviewed fast-path
+entries without network, sends other eligible calls to hosted jev or Cloudflare, and
+maps a typed answer to `allow`, `deny`, or `ask`. Missing credentials, oversized input,
+invalid configuration, failed transport, bad provider envelopes, and unusable/low-
+confidence answers cannot become auto-allow.
+
+**20. Main-thread verification and prototype retirement.** The executor reported 47
+passing tests; a separate main-thread run confirmed 47/47. Direct hook smoke checks
+confirmed `Read`→`allow` and `git status; rm -rf /`→`ask` when no model key is set.
+`claude plugin validate .` passed with two non-blocking metadata warnings (marketplace
+description and plugin author). The throwaway prototype was removed, as promised from
+day one; its live Cloudflare response and verdict baseline was moved to
+`docs/research/2026-09-22-prototype-evidence.md`. One deliberate correction to the
+plan's sample code: malformed stdin exits non-blocking before config evaluation, as
+the plan's own subprocess test required. No live provider call was made during this
+implementation verification; network integration remains to be checked on install.
+
+## 2026-09-24 — Setup skill design
+
+**21. Bundled setup skill (user request, same branch).** "Help users set the
+Cloudflare keys by invoking a skill provided by the plugin." Design decision after
+clarification: documentation-only skill at `skills/setup-cloudflare/SKILL.md` —
+detects OS + shell (macOS/Linux; zsh/bash/fish; Windows unsupported), prints the
+exact profile lines with placeholders, and verifies with set/MISSING output only.
+Combined behavior "1+2": guide plus persistence in the user's own shell profile;
+the skill never sees the token, so it cannot leak it. Plaintext-in-profile
+trade-off is stated during setup. No hook or test changes.
+
+**22. Setup skill implemented.** `skills/setup-cloudflare/SKILL.md` landed in two
+commits (6097dcf, e3aab9f): `/custom-command-validator:setup-cloudflare` detects
+macOS/Linux + zsh/bash/fish, prints the exact profile lines with placeholders,
+points at the Cloudflare dashboard (wrangler optional), and verifies set/MISSING
+only — Claude executing the skill can never receive the token. Main-thread
+verification: 47 tests OK, `claude plugin validate` passed (same two pre-existing
+metadata warnings), content reviewed verbatim against the plan, grep for
+credential-capture commands clean.
+
+## 2026-09-26 — PR #2 review fixes
+
+**23. Two reproduced regressions fixed before live setup.** Main-thread review of
+PR #2 found that malformed Cloudflare JSON (`null` or a non-object `result`)
+raised `AttributeError` and resumed native permissions rather than forcing `ask`.
+Explicit envelope type checks now route those responses through the existing
+known-error path. Regression coverage exercises twelve malformed envelope shapes
+through `main()` and separately preserves non-blocking behavior for genuinely
+unexpected internal failures.
+
+The bundled setup check also mixed shell and Python single quotes: missing vars
+raised `NameError`, while present vars printed `<class 'set'>`. Its status output
+now uses shell-safe quoting. Tests extract the actual skill snippet and execute
+absent, present, and mixed dummy environments without inheriting credentials.
+Both defects were reproduced by failing tests before the fixes. Main-thread final
+verification: 52 tests, 50 passed and 2 skipped (zsh/fish unavailable); marketplace
+validation passed with the same two metadata warnings. No live provider calls or
+credentials were used. The requested subagent implementation used the prescribed
+main-thread fallback because the available Agent tool requires isolation, contrary
+to this project's shared-checkout-only policy.
+
+**24. Local acceptance plan retained.**
+`docs/plans/2026-09-26-pr-2-local-test-plan.md` records the original review evidence,
+regression results, private credential setup, bounded live classification, and
+installed-plugin checks. Direct Python tests do not prove hook registration or
+actual prompt/deny behavior inside Claude Code. Live tests remain pending.
+
+## 2026-09-27 — Live Cloudflare verification
+
+**25. Live Cloudflare contract tests passed.** The user completed setup via the
+bundled skill. Direct hook classification checks against Cloudflare Workers AI
+(`typesafe/jev`) succeeded on all three test cases with inert JSON inputs:
+- Benign command (`ls -la`): returned `allow` (`jev: allowed (confidence 0.91)`).
+- Destructive command (`rm -rf /`): returned `deny` (`jev: rejected (confidence 1)`).
+- Sensitive command (`git push --force origin main`): returned `ask` (`jev: human_ask (confidence 0.5)`).
+- Blank token check: confirmed fail-safe `ask` (`provider API key not set`).
+Zero credential material was printed or logged. Phase D of the local test plan is
+complete and verified live.
+
+**Next:** verify end-to-end hook interception inside Claude Code sessions.
