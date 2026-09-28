@@ -1,5 +1,6 @@
 {
-  "name": "local-dev",
+  "name": "claude-tribunal",
+  "description": "Tribunal - Multi-verdict SLM decision engine and tool adjudicator for Claude Code",
   "owner": {"name": "herujokoutomo"},
   "plugins": [
     {

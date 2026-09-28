@@ -32,17 +32,31 @@ Tribunal is designed around strict defensive defaults:
 
 ## Installation
 
-Install from a local clone using Claude Code's plugin manager:
+### For External Testers (Direct from GitHub)
+
+Install directly into Claude Code with two simple commands:
 
 ```bash
-# 1. Register the local repository as a plugin marketplace
-/plugin marketplace add /path/to/claude-tribunal
+# 1. Add the Tribunal marketplace from GitHub
+/plugin marketplace add heruujoko/claude-tribunal
 
-# 2. Install the tribunal plugin from the local marketplace
-/plugin install tribunal@local-dev
+# 2. Install the tribunal plugin
+/plugin install tribunal@claude-tribunal
 ```
 
-*(Note: Replace `/path/to/claude-tribunal` with the absolute path to your cloned repository.)*
+*(After installation, restart Claude Code or run `/reload-plugins` to load the hook and skill).*
+
+### For Local Development
+
+If you are developing locally or testing changes from a clone:
+
+```bash
+# 1. Register your local clone as a marketplace
+/plugin marketplace add /path/to/claude-tribunal
+
+# 2. Install the plugin from the local marketplace
+/plugin install tribunal@claude-tribunal
+```
 
 ---
 

@@ -51,4 +51,4 @@ Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no co
 
 - Plugin hook registration uses exec form (`"command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/tribunal.py"]`, `timeout: 30`) — never shell form.
 - Verified hook facts worth trusting from research docs: hook `ask` forces the prompt even in auto mode; deny reasons go to Claude, allow/ask reasons to the user only; exit 0 + no stdout = no decision.
-- Install route is a local marketplace: repo-root `.claude-plugin/marketplace.json` → `/plugin marketplace add <repo>` → `/plugin install tribunal@local-dev`.
+- Install route is a marketplace: repo-root `.claude-plugin/marketplace.json` → `/plugin marketplace add heruujoko/claude-tribunal` (or local clone path) → `/plugin install tribunal@claude-tribunal`.
