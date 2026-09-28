@@ -226,8 +226,10 @@ convene the Tribunal to offload open-ended structured decisions to the SLM.
 - Hook script created as `hooks/tribunal.py`. An import wrapper in `hooks/validator.py`
   preserves backward compatibility.
 - Environment variable configuration now prefers `TRIBUNAL_*` (`TRIBUNAL_PROVIDER`,
-  `TRIBUNAL_JEV_URL`, `TRIBUNAL_MODEL`, `TRIBUNAL_TIMEOUT`, `TRIBUNAL_MIN_CONFIDENCE`,
-  `TRIBUNAL_CONFIG`) while retaining seamless fallback to legacy `CCV_*` variables.
+  `TRIBUNAL_ENDPOINT`, `TRIBUNAL_API_KEY`, `TRIBUNAL_MODEL`, `TRIBUNAL_TIMEOUT`,
+  `TRIBUNAL_MIN_CONFIDENCE`, `TRIBUNAL_CONFIG`) — generalizing away from JEV-specific
+  naming to support any future decision backend — while retaining seamless fallback
+  to legacy `TRIBUNAL_JEV_URL`, `JEV_API_KEY`, and `CCV_*` variables.
 - Plugin manifest (`.claude-plugin/plugin.json`) and marketplace manifest
   (`.claude-plugin/marketplace.json`) now register under plugin name `tribunal`.
 - Skill updated to `tribunal:setup-cloudflare` referencing `TRIBUNAL_PROVIDER` and

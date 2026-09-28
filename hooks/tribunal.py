@@ -12,7 +12,8 @@ import urllib.request
 
 CHOICE_MAP = {"allowed": "allow", "rejected": "deny", "human_ask": "ask"}
 MAX_INPUT_BYTES = 8192
-DEFAULT_JEV_URL = "https://jevtypesafeai.com/api/v1/decide"
+DEFAULT_ENDPOINT = "https://jevtypesafeai.com/api/v1/decide"
+DEFAULT_JEV_URL = DEFAULT_ENDPOINT  # backwards compatibility alias
 DEFAULT_SAFE_TOOLS = ["Read", "Glob", "Grep", "TodoWrite",
                       "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 DEFAULT_SAFE_COMMANDS = ["git status", "pwd"]
@@ -65,12 +66,20 @@ def load_config(env=None):
         account = env.get("CLOUDFLARE_ACCOUNT_ID", "")
         if not account or not account.isalnum():
             raise ValueError("invalid CLOUDFLARE_ACCOUNT_ID")
-        cfg["jev_url"] = (f"https://api.cloudflare.com/client/v4"
-                          f"/accounts/{account}/ai/run")
+        endpoint = (f"https://api.cloudflare.com/client/v4"
+                    f"/accounts/{account}/ai/run")
+        cfg["endpoint"] = endpoint
+        cfg["jev_url"] = endpoint  # backwards compatibility alias
         cfg["api_key"] = env.get("CLOUDFLARE_API_TOKEN", "")
     else:
-        cfg["jev_url"] = _get_env_var(env, "JEV_URL", DEFAULT_JEV_URL)
-        cfg["api_key"] = env.get("JEV_API_KEY", "")
+        endpoint = (env.get("TRIBUNAL_ENDPOINT")
+                    or env.get("TRIBUNAL_API_URL")
+                    or _get_env_var(env, "JEV_URL")
+                    or DEFAULT_ENDPOINT)
+        cfg["endpoint"] = endpoint
+        cfg["jev_url"] = endpoint  # backwards compatibility alias
+        cfg["api_key"] = (env.get("TRIBUNAL_API_KEY")
+                          or env.get("JEV_API_KEY", ""))
     path = _get_env_var(env, "CONFIG") or os.path.join(_plugin_root(), "config.json")
     if os.path.exists(path):
         with open(path) as f:
@@ -146,7 +155,8 @@ def real_post(body, cfg):
     headers = {"Content-Type": "application/json"}
     if cfg["api_key"]:
         headers["Authorization"] = f"Bearer {cfg['api_key']}"
-    req = urllib.request.Request(cfg["jev_url"], data=json.dumps(body).encode(),
+    target_url = cfg.get("endpoint") or cfg.get("jev_url")
+    req = urllib.request.Request(target_url, data=json.dumps(body).encode(),
                                  headers=headers)
     with urllib.request.urlopen(req, timeout=cfg["timeout"]) as resp:
         data = json.load(resp)

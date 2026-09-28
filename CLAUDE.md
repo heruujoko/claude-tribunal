@@ -22,7 +22,7 @@ python3 -m unittest discover -s tests -v   # full test suite
 
 Credentials are **env-only — nothing reads a config file for keys, creds never touch this repo's disk**:
 - `TRIBUNAL_PROVIDER` (`hosted` default, or `cloudflare`; legacy `CCV_PROVIDER` accepted)
-- Hosted: `JEV_API_KEY`, optional `TRIBUNAL_JEV_URL` (legacy `CCV_JEV_URL` accepted)
+- Hosted: `TRIBUNAL_API_KEY` (or legacy `JEV_API_KEY`), optional `TRIBUNAL_ENDPOINT` (or legacy `TRIBUNAL_JEV_URL`/`CCV_JEV_URL`)
 - Cloudflare: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`
 
 ## Architecture

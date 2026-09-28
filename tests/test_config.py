@@ -40,17 +40,25 @@ class LoadConfigTests(unittest.TestCase):
     def test_tribunal_env_overrides(self):
         cfg = load_config(env={
             "TRIBUNAL_PROVIDER": "hosted",
-            "TRIBUNAL_JEV_URL": "https://console.typesafe.ai/v1/tribunal",
-            "JEV_API_KEY": "jv_live_tribunal",
-            "TRIBUNAL_MODEL": "jev-tribunal-1.0",
+            "TRIBUNAL_ENDPOINT": "https://api.example.com/v1/decide",
+            "TRIBUNAL_API_KEY": "tr_live_key",
+            "TRIBUNAL_MODEL": "slm-judge-v1",
             "TRIBUNAL_TIMEOUT": "8",
             "TRIBUNAL_MIN_CONFIDENCE": "0.85",
         })
-        self.assertEqual(cfg["jev_url"], "https://console.typesafe.ai/v1/tribunal")
-        self.assertEqual(cfg["api_key"], "jv_live_tribunal")
-        self.assertEqual(cfg["model"], "jev-tribunal-1.0")
+        self.assertEqual(cfg["endpoint"], "https://api.example.com/v1/decide")
+        self.assertEqual(cfg["jev_url"], "https://api.example.com/v1/decide")
+        self.assertEqual(cfg["api_key"], "tr_live_key")
+        self.assertEqual(cfg["model"], "slm-judge-v1")
         self.assertEqual(cfg["timeout"], 8)
         self.assertEqual(cfg["min_confidence"], 0.85)
+
+    def test_tribunal_endpoint_precedence(self):
+        cfg = load_config(env={
+            "TRIBUNAL_ENDPOINT": "https://endpoint.example.com",
+            "TRIBUNAL_JEV_URL": "https://jev.example.com",
+        })
+        self.assertEqual(cfg["endpoint"], "https://endpoint.example.com")
 
     def test_tribunal_takes_precedence_over_ccv(self):
         cfg = load_config(env={

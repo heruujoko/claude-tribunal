@@ -65,13 +65,15 @@ Required environment variables:
 * `CLOUDFLARE_ACCOUNT_ID=<your-account-id>`
 * `CLOUDFLARE_API_TOKEN=<your-api-token-with-workers-ai-read>`
 
-### Option B: Hosted Jev Endpoint
+### Option B: Hosted Decision Endpoint
 
-To use the hosted TypeSafe AI endpoint:
+To use the hosted decision endpoint:
 
 ```bash
 export TRIBUNAL_PROVIDER=hosted
-export JEV_API_KEY=<your-jev-api-key>
+export TRIBUNAL_API_KEY=<your-api-key>
+# Optional: override default endpoint (https://jevtypesafeai.com/api/v1/decide)
+# export TRIBUNAL_ENDPOINT=https://your-endpoint/v1/decide
 ```
 
 ---
@@ -81,8 +83,8 @@ export JEV_API_KEY=<your-jev-api-key>
 | Variable | Description | Default |
 |---|---|---|
 | `TRIBUNAL_PROVIDER` | Provider backend (`hosted` or `cloudflare`) | `hosted` |
-| `TRIBUNAL_JEV_URL` | Jev decide endpoint URL (hosted provider) | `https://jevtypesafeai.com/api/v1/decide` |
-| `JEV_API_KEY` | API key for hosted jev endpoint | `""` |
+| `TRIBUNAL_ENDPOINT` | Decision endpoint URL (hosted provider) | `https://jevtypesafeai.com/api/v1/decide` |
+| `TRIBUNAL_API_KEY` | API key for decision endpoint (legacy `JEV_API_KEY` also supported) | `""` |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID (required for `cloudflare` provider) | `""` |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token (for `cloudflare` provider) | `""` |
 | `TRIBUNAL_MODEL` | Decision model ID | `jev-latest` (`typesafe/jev` for Cloudflare) |
@@ -90,7 +92,7 @@ export JEV_API_KEY=<your-jev-api-key>
 | `TRIBUNAL_MIN_CONFIDENCE` | Minimum confidence threshold (`0.0` to `1.0`) below which verdicts fall back to `ask` | `0.5` |
 | `TRIBUNAL_CONFIG` | Path to custom rules JSON file | `${PLUGIN_ROOT}/config.json` |
 
-*(Note: Legacy `CCV_*` environment variables remain supported for backwards compatibility.)*
+*(Note: Legacy `TRIBUNAL_JEV_URL`, `JEV_API_KEY`, and `CCV_*` environment variables remain supported for backwards compatibility.)*
 
 ---
 
