@@ -1,6 +1,6 @@
 import unittest
 
-from hooks.validator import map_answer
+from hooks.tribunal import map_answer
 
 
 class MapAnswerTests(unittest.TestCase):

@@ -1,64 +1,104 @@
-# Claude Custom Command Validator
+# Claude Tribunal (`tribunal`)
 
-A Claude Code plugin whose `PreToolUse` hook (matcher `*`) routes every tool call through **jev** — TypeSafe AI's typed-decision model — to classify each action as allowed, rejected, or requiring human approval.
+> Multi-verdict SLM decision engine and tool adjudicator for Claude Code.
 
-## Verdict Mapping
+Tribunal is a Claude Code plugin whose `PreToolUse` hook intercepts every tool call and evaluates it against **jev** — TypeSafe AI's typed-decision model. 
 
-| jev `choice` | Hook output | Effect |
+Like the Living Tribunal's three-faced judgment, every action is weighed into one of three explicit verdicts:
+
+| Verdict (`choice`) | Hook Decision | Effect |
 |---|---|---|
-| `allowed` | `allow` | Runs without prompting |
-| `rejected` | `deny` + reason | Blocked; reason shown to Claude |
-| `human_ask` | `ask` | Normal human permission prompt |
+| `allowed` | `allow` | Safe and reversible; runs without prompting |
+| `rejected` | `deny` + reason | Unsafe or destructive; blocked with explanation returned to Claude |
+| `human_ask` | `ask` | Sensitive or uncertain; defers to human confirmation |
 
-Evaluations operate on two transports:
-- **Hosted**: `POST` to `CCV_JEV_URL` (default: `https://jevtypesafeai.com/api/v1/decide`).
-- **Cloudflare**: `POST` to Cloudflare Workers AI (`https://api.cloudflare.com/client/v4/accounts/{account}/ai/run`).
+---
 
-A deterministic fast path automatically allows read-only tools and exact safe commands with zero network calls.
+## How It Works
+
+Tribunal operates in two evaluation tiers:
+
+1. **Fast Path (0 ms, 0 network):** Safe read-only inspection tools (`Read`, `Glob`, `Grep`, Task tools) and exact harmless shell commands (`git status`, `pwd`) are immediately approved locally without making a network call.
+2. **Jev SLM Path:** Any tool call outside the fast path is dispatched to a fast small language model (`jev`) on your configured provider (Hosted or Cloudflare Workers AI) with structured evaluation criteria. The model's typed answer is mapped directly to Claude Code's permission system.
+
+### Core Invariant: Fail-to-Human
+
+Tribunal is designed around strict defensive defaults:
+* **Fail-to-Human:** If an API token is missing, the endpoint is unreachable, an envelope is malformed, or model confidence falls below the threshold, Tribunal falls back to `ask`. It **never** fails open into an auto-allow.
+* **Auto Mode Override:** In Claude Code auto mode, a hook decision of `ask` forces an interactive confirmation prompt.
+* **Input Bounds:** Inputs exceeding 8 KiB bypass SLM evaluation and require human review directly.
+
+---
 
 ## Installation
 
-Install from a local clone using the plugin marketplace:
+Install from a local clone using Claude Code's plugin manager:
 
 ```bash
-/plugin marketplace add /path/to/claude-custom-command-validator
-/plugin install custom-command-validator@local-dev
+# 1. Register the local repository as a plugin marketplace
+/plugin marketplace add /path/to/claude-tribunal
+
+# 2. Install the tribunal plugin from the local marketplace
+/plugin install tribunal@local-dev
 ```
 
-## Initial setup (Cloudflare provider)
+*(Note: Replace `/path/to/claude-tribunal` with the absolute path to your cloned repository.)*
 
-The plugin bundles a setup skill that detects your OS and shell and shows the exact
-lines for your profile (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, or fish config):
+---
 
+## Configuration
+
+Credentials are **environment-only** — they are never read from disk or stored in configuration files.
+
+### Option A: Cloudflare Workers AI (Recommended)
+
+Run the bundled setup skill inside Claude Code:
+
+```bash
+/tribunal:setup-cloudflare
 ```
-/custom-command-validator:setup-cloudflare
+
+The skill detects your OS and shell (zsh, bash, or fish), provides the exact export commands to add to your shell profile, and verifies the environment without ever reading or exposing your secret token.
+
+Required environment variables:
+* `TRIBUNAL_PROVIDER=cloudflare`
+* `CLOUDFLARE_ACCOUNT_ID=<your-account-id>`
+* `CLOUDFLARE_API_TOKEN=<your-api-token-with-workers-ai-read>`
+
+### Option B: Hosted Decision Endpoint
+
+To use the hosted decision endpoint:
+
+```bash
+export TRIBUNAL_PROVIDER=hosted
+export TRIBUNAL_API_KEY=<your-api-key>
+# Optional: override default endpoint (https://jevtypesafeai.com/api/v1/decide)
+# export TRIBUNAL_ENDPOINT=https://your-endpoint/v1/decide
 ```
 
-It sets `CCV_PROVIDER=cloudflare`, `CLOUDFLARE_ACCOUNT_ID`, and
-`CLOUDFLARE_API_TOKEN` persistently in your shell profile. The skill never reads,
-receives, or writes your token — you edit the profile yourself, and it only verifies
-`set`/`MISSING` per variable. Note the token lives in plaintext in the profile.
-macOS and Linux only (zsh, bash, fish).
+---
 
-## Environment Variables & Configuration
-
-Credentials are env-only — they are never read from disk.
+## Environment Variables Reference
 
 | Variable | Description | Default |
 |---|---|---|
-| `CCV_PROVIDER` | Provider backend (`hosted` or `cloudflare`) | `hosted` |
-| `CCV_JEV_URL` | Jev decide endpoint URL (hosted provider) | `https://jevtypesafeai.com/api/v1/decide` |
-| `JEV_API_KEY` | API key for hosted jev endpoint | `""` |
+| `TRIBUNAL_PROVIDER` | Provider backend (`hosted` or `cloudflare`) | `hosted` |
+| `TRIBUNAL_ENDPOINT` | Decision endpoint URL (hosted provider) | `https://jevtypesafeai.com/api/v1/decide` |
+| `TRIBUNAL_API_KEY` | API key for decision endpoint (legacy `JEV_API_KEY` also supported) | `""` |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID (required for `cloudflare` provider) | `""` |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token (for `cloudflare` provider) | `""` |
-| `CCV_MODEL` | Decision model | `jev-latest` (`typesafe/jev` for Cloudflare) |
-| `CCV_TIMEOUT` | Request timeout in seconds | `10` |
-| `CCV_MIN_CONFIDENCE` | Minimum confidence threshold (`0.0` to `1.0`) below which verdicts fall back to `ask` | `0.5` |
-| `CCV_CONFIG` | Path to custom rules JSON file | `${PLUGIN_ROOT}/config.json` |
+| `TRIBUNAL_MODEL` | Decision model ID | `jev-latest` (`typesafe/jev` for Cloudflare) |
+| `TRIBUNAL_TIMEOUT` | Request timeout in seconds | `10` |
+| `TRIBUNAL_MIN_CONFIDENCE` | Minimum confidence threshold (`0.0` to `1.0`) below which verdicts fall back to `ask` | `0.5` |
+| `TRIBUNAL_CONFIG` | Path to custom rules JSON file | `${PLUGIN_ROOT}/config.json` |
 
-## Fast-Path Rules File
+*(Note: Legacy `TRIBUNAL_JEV_URL`, `JEV_API_KEY`, and `CCV_*` environment variables remain supported for backwards compatibility.)*
 
-An optional JSON rules file (`config.json` or path in `CCV_CONFIG`) can customize fast-path rules (see `config.example.json`):
+---
+
+## Fast-Path Customization (Optional)
+
+You can customize the local fast path by providing a `config.json` (or pointing `TRIBUNAL_CONFIG` to a JSON file). See `config.example.json`:
 
 ```json
 {
@@ -67,21 +107,14 @@ An optional JSON rules file (`config.json` or path in `CCV_CONFIG`) can customiz
 }
 ```
 
-**Replace semantics:**
-- The rules file may replace only `safe_tools` and `safe_commands`.
-- Credentials and provider settings remain env-only and cannot be specified in the rules file.
-- `safe_commands` and `safe_tools` may only contain subsets of the built-in defaults (removing entries to tighten permissions); they cannot add arbitrary shell commands or tools.
+* **Restrictive only:** You may remove built-in tools or commands to tighten restrictions, but you cannot introduce arbitrary auto-allowed commands through this file.
+* **Credentials forbidden:** The rules file cannot define tokens, accounts, or providers.
 
-## Hook Semantics & Nuances
-
-- **Fail-to-human**: Any unexpected crash, missing API key, transport error, or malformed response falls through to human confirmation (`ask` or non-blocking exit), never auto-allow.
-- **Auto mode override**: A hook decision of `ask` forces a human prompt even in Claude Code's auto mode.
-- **Interactive tools**: `allow` cannot auto-approve interactive tools like `AskUserQuestion` or `ExitPlanMode`.
-- **Reason visibility**: Deny reasons are shown to Claude to guide tool adjustments; allow and ask reasons are shown to the user only.
+---
 
 ## Running Tests
 
-Run the test suite using Python 3 stdlib `unittest`:
+Tribunal uses Python 3 standard library only (`unittest`, `urllib`, `json`) with no external pip dependencies:
 
 ```bash
 python3 -m unittest discover -s tests -v

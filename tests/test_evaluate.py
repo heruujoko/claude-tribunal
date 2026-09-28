@@ -1,6 +1,6 @@
 import unittest
 
-from hooks.validator import evaluate, load_config
+from hooks.tribunal import evaluate, load_config
 
 
 def no_network(body, cfg):
