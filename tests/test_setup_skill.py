@@ -6,7 +6,7 @@ import unittest
 
 
 SKILL = Path(__file__).resolve().parents[1] / "skills/setup-cloudflare/SKILL.md"
-VARIABLES = ("CCV_PROVIDER", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
+VARIABLES = ("TRIBUNAL_PROVIDER", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
 
 
 class SetupSkillTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class SetupSkillTests(unittest.TestCase):
         end = section.index("'\n", start) + 1
         command = section[start:end]
         cases = ({}, dict.fromkeys(VARIABLES, "dummy-secret"),
-                 {"CCV_PROVIDER": "cloudflare", "CLOUDFLARE_ACCOUNT_ID": "dummy-account"})
+                 {"TRIBUNAL_PROVIDER": "cloudflare", "CLOUDFLARE_ACCOUNT_ID": "dummy-account"})
         for values in cases:
             with self.subTest(present=sorted(values)):
                 # Do not inherit credentials or load user shell profiles.

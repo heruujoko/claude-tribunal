@@ -3,9 +3,9 @@
   "owner": {"name": "herujokoutomo"},
   "plugins": [
     {
-      "name": "custom-command-validator",
+      "name": "tribunal",
       "source": ".",
-      "description": "jev-backed permission validator for Claude Code tool calls"
+      "description": "Multi-verdict SLM decision engine and tool adjudicator for Claude Code"
     }
   ]
 }

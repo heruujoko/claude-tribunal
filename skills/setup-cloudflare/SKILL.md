@@ -1,6 +1,6 @@
 ---
 name: setup-cloudflare
-description: Configure the custom-command-validator plugin to use Cloudflare Workers AI as its jev provider. Detects the user's OS and shell, shows the exact lines to persist CCV_PROVIDER, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN in the right profile file, and verifies the result without ever exposing the token. Use when the user wants to set up, configure, or troubleshoot Cloudflare credentials for this plugin.
+description: Configure the tribunal plugin to use Cloudflare Workers AI as its jev provider. Detects the user's OS and shell, shows the exact lines to persist TRIBUNAL_PROVIDER, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN in the right profile file, and verifies the result without ever exposing the token. Use when the user wants to set up, configure, or troubleshoot Cloudflare credentials for this plugin.
 ---
 
 # Set up the Cloudflare provider
@@ -43,13 +43,13 @@ State plainly: **the token will be stored in plaintext in the profile file.**
 
 POSIX shells (zsh/bash):
 
-    export CCV_PROVIDER=cloudflare
+    export TRIBUNAL_PROVIDER=cloudflare
     export CLOUDFLARE_ACCOUNT_ID=<account id>
     export CLOUDFLARE_API_TOKEN=<api token>
 
 fish:
 
-    set -gx CCV_PROVIDER cloudflare
+    set -gx TRIBUNAL_PROVIDER cloudflare
     set -gx CLOUDFLARE_ACCOUNT_ID <account id>
     set -gx CLOUDFLARE_API_TOKEN <api token>
 
@@ -69,7 +69,7 @@ Tell the user to edit the profile locally, save, and open a **new terminal**.
 Give the user this check — it prints set/MISSING per variable, never values:
 
     python3 -c 'import os
-for v in ("CCV_PROVIDER", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"):
+for v in ("TRIBUNAL_PROVIDER", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"):
     print("{}: {}".format(v, "set" if os.environ.get(v) else "MISSING"))'
 
 All three `set` → done. Any `MISSING` → the profile was not sourced or the
@@ -84,7 +84,7 @@ requires Step 2.
 If the plugin repo (or install) is on disk, offer one real verdict request:
 
     printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin main"},"cwd":"/tmp"}' \
-      | python3 <path-to-plugin>/hooks/validator.py
+      | python3 <path-to-plugin>/hooks/tribunal.py
 
 Expected: one JSON line with a `permissionDecision` of `deny` or `ask` and a
 reason naming jev. The token appears nowhere in the output. If it fails, the

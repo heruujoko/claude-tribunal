@@ -212,3 +212,28 @@ Zero credential material was printed or logged. Phase D of the local test plan i
 complete and verified live.
 
 **Next:** verify end-to-end hook interception inside Claude Code sessions.
+
+## 2026-09-28 — Project Evolution: Renamed to Tribunal
+
+**26. Identity and scope evolution.** The project evolved from a command validator
+into **Tribunal** (`claude-tribunal`, plugin ID `tribunal`). The name reflects the
+Living Tribunal's three-faced judgment, mapping directly to the three typed verdicts
+rendered by jev (`allowed` → `allow`, `rejected` → `deny`, `human_ask` → `ask`). It
+also establishes the foundation for future expansions where the parent session can
+convene the Tribunal to offload open-ended structured decisions to the SLM.
+
+**27. Implementation & backwards compatibility.**
+- Hook script created as `hooks/tribunal.py`. An import wrapper in `hooks/validator.py`
+  preserves backward compatibility.
+- Environment variable configuration now prefers `TRIBUNAL_*` (`TRIBUNAL_PROVIDER`,
+  `TRIBUNAL_JEV_URL`, `TRIBUNAL_MODEL`, `TRIBUNAL_TIMEOUT`, `TRIBUNAL_MIN_CONFIDENCE`,
+  `TRIBUNAL_CONFIG`) while retaining seamless fallback to legacy `CCV_*` variables.
+- Plugin manifest (`.claude-plugin/plugin.json`) and marketplace manifest
+  (`.claude-plugin/marketplace.json`) now register under plugin name `tribunal`.
+- Skill updated to `tribunal:setup-cloudflare` referencing `TRIBUNAL_PROVIDER` and
+  `hooks/tribunal.py`.
+- Documentation (`README.md`, `CLAUDE.md`) refreshed, keeping user guidance strictly
+  focused on currently supported functionality.
+- Test suite updated to 55 unit tests (53 passed, 2 skipped due to optional shells),
+  covering new `TRIBUNAL_*` env handling, precedence over `CCV_*`, and legacy wrapper execution.
+

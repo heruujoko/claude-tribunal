@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from hooks.validator import DEFAULT_SAFE_COMMANDS, DEFAULT_SAFE_TOOLS, load_config
+from hooks.tribunal import DEFAULT_SAFE_COMMANDS, DEFAULT_SAFE_TOOLS, load_config
 
 
 def write_cfg(rules):
@@ -36,6 +36,28 @@ class LoadConfigTests(unittest.TestCase):
         self.assertEqual(cfg["model"], "jev-1.13.0")
         self.assertEqual(cfg["timeout"], 5)
         self.assertEqual(cfg["min_confidence"], 0.7)
+
+    def test_tribunal_env_overrides(self):
+        cfg = load_config(env={
+            "TRIBUNAL_PROVIDER": "hosted",
+            "TRIBUNAL_JEV_URL": "https://console.typesafe.ai/v1/tribunal",
+            "JEV_API_KEY": "jv_live_tribunal",
+            "TRIBUNAL_MODEL": "jev-tribunal-1.0",
+            "TRIBUNAL_TIMEOUT": "8",
+            "TRIBUNAL_MIN_CONFIDENCE": "0.85",
+        })
+        self.assertEqual(cfg["jev_url"], "https://console.typesafe.ai/v1/tribunal")
+        self.assertEqual(cfg["api_key"], "jv_live_tribunal")
+        self.assertEqual(cfg["model"], "jev-tribunal-1.0")
+        self.assertEqual(cfg["timeout"], 8)
+        self.assertEqual(cfg["min_confidence"], 0.85)
+
+    def test_tribunal_takes_precedence_over_ccv(self):
+        cfg = load_config(env={
+            "TRIBUNAL_TIMEOUT": "12",
+            "CCV_TIMEOUT": "4",
+        })
+        self.assertEqual(cfg["timeout"], 12)
 
     def test_cloudflare_provider(self):
         cfg = load_config(env={"CCV_PROVIDER": "cloudflare",

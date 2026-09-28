@@ -1,5 +1,5 @@
 {
-  "name": "custom-command-validator",
-  "description": "Routes every tool call through a jev typed-decision model for allowed/rejected/human_ask verdicts",
+  "name": "tribunal",
+  "description": "Multi-verdict SLM decision engine and tool adjudicator for Claude Code",
   "version": "0.1.0"
 }
