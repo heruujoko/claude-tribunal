@@ -239,3 +239,18 @@ convene the Tribunal to offload open-ended structured decisions to the SLM.
 - Test suite updated to 55 unit tests (53 passed, 2 skipped due to optional shells),
   covering new `TRIBUNAL_*` env handling, precedence over `CCV_*`, and legacy wrapper execution.
 
+
+## 2026-09-30 — Content screen: spike and design (issue #5)
+
+**28. Spike before design.** Four hook facts were undocumented, so headless `claude -p`
+sessions with a throwaway `--settings` file captured real payloads (global settings never
+touched). Findings (`docs/research/2026-09-30-content-screen-spike.md`): `Skill` input is the
+name only (`plugin:skill` for plugins), PostToolUse on `Skill` carries no body,
+`UserPromptExpansion` carries no expanded text but its `decision: block` works, and
+PostToolUse `additionalContext` does reach Claude. Consequence: skills are screened from the
+file on disk in PreToolUse / UserPromptExpansion; web results are warned about, not replaced.
+
+**29. Design decisions** (`docs/plans/2026-09-30-content-screen-design.md`): default-on via
+`TRIBUNAL_SCAN` (unset or invalid → both scopes, `off` → none); reuse the live-proven `choice`
+verdict shape instead of `noul`; chunk instead of truncate (worst chunk wins); cache only
+clean skill verdicts, keyed by content; an unresolvable skill keeps today's name-only verdict.
