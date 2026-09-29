@@ -12,6 +12,7 @@ import urllib.request
 
 CHOICE_MAP = {"allowed": "allow", "rejected": "deny", "human_ask": "ask"}
 MAX_INPUT_BYTES = 8192
+SCAN_SCOPES = frozenset({"skills", "web"})
 DEFAULT_ENDPOINT = "https://jevtypesafeai.com/api/v1/decide"
 DEFAULT_JEV_URL = DEFAULT_ENDPOINT  # backwards compatibility alias
 DEFAULT_SAFE_TOOLS = ["Read", "Glob", "Grep", "TodoWrite",
@@ -30,6 +31,27 @@ VERDICT_CRITERIA = {
 
 def _plugin_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def scan_scopes(env):
+    """TRIBUNAL_SCAN -> enabled scopes. Unset/empty/invalid -> both (fail tight); 'off' -> none."""
+    raw = env.get("TRIBUNAL_SCAN", "").strip().lower()
+    if raw == "off":
+        return set()
+    parts = {p.strip() for p in raw.split(",") if p.strip()}
+    return parts if parts and parts <= SCAN_SCOPES else set(SCAN_SCOPES)
+
+
+def chunks(text, limit=MAX_INPUT_BYTES):
+    """Split into <= limit UTF-8 byte pieces on character boundaries; never drops text."""
+    data, out = text.encode("utf-8"), []
+    while data:
+        cut = min(limit, len(data))
+        while cut < len(data) and data[cut] & 0xC0 == 0x80:  # don't split a character
+            cut -= 1
+        out.append(data[:cut].decode("utf-8"))
+        data = data[cut:]
+    return out
 
 
 def _get_env_var(env, suffix, default=None):
