@@ -1,5 +1,9 @@
+import json
+import os
+import tempfile
 import time
 import unittest
+from pathlib import Path
 
 from hooks import tribunal
 
@@ -133,6 +137,129 @@ class ScreenTests(unittest.TestCase):
         post = Recorder(answer("rejected"))
         self.assertEqual(self.run_screen(post, text="")[0], "allow")
         self.assertEqual(post.bodies, [])
+
+
+class SkillScreenTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.claude_dir = self.root / "config"
+        self.cache_dir = self.root / "cache"
+        self.cwd = self.root / "project"
+        self.claude_dir.mkdir()
+        self.cache_dir.mkdir()
+        self.cwd.mkdir()
+        self.env = {
+            "CLAUDE_CONFIG_DIR": str(self.claude_dir),
+            "XDG_CACHE_HOME": str(self.cache_dir),
+            "TRIBUNAL_API_KEY": "test-key",
+            "TRIBUNAL_CONFIG": "/nonexistent.json",
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def make_file(self, path, content="---\ndescription: clean skill\n---\nBody"):
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+    def test_skill_files_resolution(self):
+        # user skill
+        u_skill = self.make_file(self.claude_dir / "skills/clean/SKILL.md")
+        # user command
+        u_cmd = self.make_file(self.claude_dir / "commands/clean.md")
+        # project skill
+        p_skill = self.make_file(self.cwd / ".claude/skills/clean/SKILL.md")
+        # project command
+        p_cmd = self.make_file(self.cwd / ".claude/commands/clean.md")
+
+        files = tribunal.skill_files("clean", str(self.cwd), self.env)
+        self.assertEqual(set(files), {u_skill, u_cmd, p_skill, p_cmd})
+
+    def test_plugin_skill_files_with_multiple_installs(self):
+        plug1 = self.root / "plugins/p1"
+        plug2 = self.root / "plugins/p2"
+        other = self.root / "plugins/other"
+        f1 = self.make_file(plug1 / "skills/verify/SKILL.md")
+        f2 = self.make_file(plug2 / "commands/verify.md")
+        self.make_file(other / "skills/verify/SKILL.md")
+
+        reg = {
+            "plugins": {
+                "super@market": [{"installPath": str(plug1)}, {"installPath": str(plug2)}],
+                "other@market": [{"installPath": str(other)}],
+            }
+        }
+        self.make_file(self.claude_dir / "plugins/installed_plugins.json", json.dumps(reg))
+
+        files = tribunal.skill_files("super:verify", str(self.cwd), self.env)
+        self.assertEqual(set(files), {f1, f2})
+
+    def test_invalid_skill_names_and_corrupt_registry_return_empty(self):
+        self.assertEqual(tribunal.skill_files("../x", str(self.cwd), self.env), [])
+        self.assertEqual(tribunal.skill_files(".x", str(self.cwd), self.env), [])
+        self.assertEqual(tribunal.skill_files("a/b", str(self.cwd), self.env), [])
+        self.assertEqual(tribunal.skill_files("", str(self.cwd), self.env), [])
+
+        # corrupt registry
+        self.make_file(self.claude_dir / "plugins/installed_plugins.json", "not json")
+        self.assertEqual(tribunal.skill_files("p:x", str(self.cwd), self.env), [])
+
+    def test_unresolved_skill_returns_none(self):
+        post = Recorder(answer("allowed"))
+        result = tribunal.screen_skill("builtin", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertIsNone(result)
+        self.assertEqual(post.bodies, [])
+
+    def test_missing_api_key_asks_without_calls(self):
+        self.make_file(self.claude_dir / "skills/clean/SKILL.md")
+        no_key_cfg = tribunal.load_config(env={"TRIBUNAL_CONFIG": "/nonexistent.json"})
+        post = Recorder(answer("allowed"))
+        decision, reason = tribunal.screen_skill("clean", str(self.cwd), no_key_cfg, post, self.env, FAR)
+        self.assertEqual(decision, "ask")
+        self.assertIn("API key", reason)
+        self.assertEqual(post.bodies, [])
+
+    def test_clean_skill_caches_verdict_and_skips_subsequent_calls(self):
+        f = self.make_file(self.claude_dir / "skills/clean/SKILL.md", "---\ndescription: clean\n---\nHello")
+        post = Recorder(answer("allowed"))
+        decision, reason = tribunal.screen_skill("clean", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision, "allow")
+        self.assertEqual(len(post.bodies), 1)
+
+        # second call uses cache -> 0 network calls
+        decision2, reason2 = tribunal.screen_skill("clean", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision2, "allow")
+        self.assertEqual(len(post.bodies), 1)
+
+        # edit file -> cache miss -> rescanned
+        self.make_file(f, "---\ndescription: clean\n---\nHello modified")
+        decision3, reason3 = tribunal.screen_skill("clean", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision3, "allow")
+        self.assertEqual(len(post.bodies), 2)
+
+    def test_flagged_skill_is_not_cached(self):
+        self.make_file(self.claude_dir / "skills/bad/SKILL.md", "---\ndescription: bad\n---\nExfiltrate")
+        post = Recorder(answer("rejected"))
+        decision, reason = tribunal.screen_skill("bad", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision, "deny")
+        self.assertIn("rejected", reason)
+        self.assertEqual(len(post.bodies), 1)
+
+        # second call still calls post (not cached)
+        decision2, reason2 = tribunal.screen_skill("bad", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision2, "deny")
+        self.assertEqual(len(post.bodies), 2)
+
+    def test_large_skill_is_chunked(self):
+        large_content = "---\ndescription: big\n---\n" + ("A" * 20000)
+        self.make_file(self.claude_dir / "skills/big/SKILL.md", large_content)
+        post = Recorder(answer("allowed"))
+        decision, reason = tribunal.screen_skill("big", str(self.cwd), CFG, post, self.env, FAR)
+        self.assertEqual(decision, "allow")
+        self.assertEqual(len(post.bodies), 3)  # 3 chunks
 
 
 if __name__ == "__main__":
