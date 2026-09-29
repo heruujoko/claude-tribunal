@@ -8,9 +8,12 @@ import json
 import math
 import os
 import sys
+import time
 import urllib.request
 
 CHOICE_MAP = {"allowed": "allow", "rejected": "deny", "human_ask": "ask"}
+SEVERITY = {"allow": 0, "ask": 1, "deny": 2}
+SCREEN_BUDGET_SECONDS = 15
 MAX_INPUT_BYTES = 8192
 SCAN_SCOPES = frozenset({"skills", "web"})
 DEFAULT_ENDPOINT = "https://jevtypesafeai.com/api/v1/decide"
@@ -135,26 +138,31 @@ def map_answer(answer, min_confidence):
     return decision
 
 
+def _envelope(state, instructions, criteria, cfg):
+    """Provider-agnostic jev request; Cloudflare /ai/run wraps state+questions in "input"."""
+    core = {
+        "state": state,
+        "questions": {
+            "verdict": {
+                "type": "choice",
+                "instructions": instructions,
+                "criteria": criteria,
+            }
+        },
+    }
+    if cfg["provider"] == "cloudflare":
+        return {"model": cfg["model"], "input": core}
+    return {"model": cfg["model"], **core}
+
+
 def build_request(payload, cfg):
     tool = payload.get("tool_name", "")
     raw = json.dumps(payload.get("tool_input", {}), default=str, ensure_ascii=False)
     if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
         raise ValueError("tool input exceeds tribunal budget")
     # evaluate() returns ask before calling this builder when the input is too large.
-    core = {
-        "state": {"cwd": payload.get("cwd", ""), "tool": tool, "input": raw},
-        "questions": {
-            "verdict": {
-                "type": "choice",
-                "instructions": VERDICT_INSTRUCTIONS,
-                "criteria": VERDICT_CRITERIA,
-            }
-        },
-    }
-    # Cloudflare /ai/run wraps state+questions inside "input" (live-proven envelope)
-    if cfg["provider"] == "cloudflare":
-        return {"model": cfg["model"], "input": core}
-    return {"model": cfg["model"], **core}
+    return _envelope({"cwd": payload.get("cwd", ""), "tool": tool, "input": raw},
+                     VERDICT_INSTRUCTIONS, VERDICT_CRITERIA, cfg)
 
 
 def extract_answer(data, provider):
@@ -206,6 +214,29 @@ def evaluate(payload, cfg, post):
     choice = answer.get("choice")
     confidence = answer.get("confidence")
     return decision, f"jev: {choice} (confidence {confidence})"
+
+
+def _describe(answer):
+    if isinstance(answer, dict):
+        return f"jev: {answer.get('choice')} (confidence {answer.get('confidence')})"
+    return "unusable jev answer"
+
+
+def screen(base, text, question, cfg, post, deadline):
+    """Worst verdict over every chunk (deny > ask > allow) -> (decision, reason)."""
+    parts = chunks(text)
+    worst, why = "allow", "clean"
+    for i, part in enumerate(parts, 1):
+        if time.monotonic() > deadline:
+            return "ask", "screen time budget exceeded"
+        state = {**base, "part": f"{i}/{len(parts)}", "content": part}
+        answer = post(_envelope(state, *question, cfg), cfg)
+        decision = map_answer(answer, cfg["min_confidence"]) or "ask"
+        if SEVERITY[decision] > SEVERITY[worst]:
+            worst, why = decision, f"part {i}/{len(parts)}: {_describe(answer)}"
+        if worst == "deny":
+            break
+    return worst, why
 
 
 def emit(decision, reason=""):
