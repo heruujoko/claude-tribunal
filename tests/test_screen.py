@@ -443,5 +443,37 @@ class FallbackTests(ScreenFixtureBase):
         self.assertEqual(expansion, {"systemMessage": "tribunal unavailable: ValueError"})
 
 
+class HookRegistrationTests(unittest.TestCase):
+    def test_hook_registration_events_and_exec_form(self):
+        hook_path = Path(__file__).resolve().parents[1] / "hooks/hooks.json"
+        data = json.loads(hook_path.read_text(encoding="utf-8"))
+        hooks = data.get("hooks", {})
+        self.assertEqual(set(hooks), {"PreToolUse", "PostToolUse", "UserPromptExpansion"})
+
+        expected_command = "python3"
+        expected_args = ["${CLAUDE_PLUGIN_ROOT}/hooks/tribunal.py"]
+
+        # PreToolUse
+        pre = hooks["PreToolUse"][0]
+        self.assertEqual(pre["matcher"], "*")
+        self.assertEqual(pre["hooks"][0]["command"], expected_command)
+        self.assertEqual(pre["hooks"][0]["args"], expected_args)
+        self.assertEqual(pre["hooks"][0]["timeout"], 30)
+
+        # PostToolUse
+        post = hooks["PostToolUse"][0]
+        self.assertEqual(post["matcher"], "WebFetch|WebSearch")
+        self.assertEqual(post["hooks"][0]["command"], expected_command)
+        self.assertEqual(post["hooks"][0]["args"], expected_args)
+        self.assertEqual(post["hooks"][0]["timeout"], 30)
+
+        # UserPromptExpansion (no matcher)
+        exp = hooks["UserPromptExpansion"][0]
+        self.assertNotIn("matcher", exp)
+        self.assertEqual(exp["hooks"][0]["command"], expected_command)
+        self.assertEqual(exp["hooks"][0]["args"], expected_args)
+        self.assertEqual(exp["hooks"][0]["timeout"], 30)
+
+
 if __name__ == "__main__":
     unittest.main()
