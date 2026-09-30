@@ -35,7 +35,7 @@ Tribunal is designed around strict defensive defaults:
 
 Tribunal screens prompt content and tool outputs across three hook events:
 
-- **Skills (`PreToolUse` on `Skill` & `UserPromptExpansion`):** Screens the backing `.md` skill files from your user, project, or installed plugin directories before their instructions reach the context window. Clean skill files are cached by content hash; unsafe skills are blocked (`UserPromptExpansion`) or require confirmation (`PreToolUse`).
+- **Skills (`PreToolUse` on `Skill` & `UserPromptExpansion`):** Screens the backing `.md` skill files from your user, project, or installed plugin directories before their instructions reach the context window. Clean skill files are cached by content hash; flagged skills are blocked (`/name` expansion) or denied with the reason shown to Claude (`Skill` tool); uncertain verdicts ask you. Built-in skills with no file on disk keep the regular tool-call verdict.
 - **Web (`PostToolUse` on `WebFetch` & `WebSearch`):** Screens fetched web content for prompt injection and hidden instructions. Flagged content appends an untrusted-data warning context for Claude, never replaces or hides original text.
 
 Both scopes are **on by default** with no additional configuration.
@@ -48,7 +48,7 @@ To configure or disable scanning scopes, run the bundled setup skill:
 
 ### Content Screening Limitations & Cost
 - **Cost:** One jev SLM call per web fetch/search result. Skills are content-addressed and cached upon clean verdict; repeated invocations cost zero additional SLM calls until file modification.
-- **Scope Limits:** Small language models catch overt prompt injection and unauthorized instruction escapes. Direct filesystem inspection (`Read` of skill reference files outside the skill command workflow) is governed by fast-path/tool-use validation, not prompt screening.
+- **Scope Limits:** A small model catches overt injection, not skilled obfuscation; the per-tool-call gate remains the backstop for whatever a bad skill or page tries to *do*. Only `SKILL.md` / command files are screened: reference files a skill later loads with `Read` are not (`Read` is on the fast path).
 
 ---
 

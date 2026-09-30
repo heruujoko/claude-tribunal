@@ -35,7 +35,7 @@ Tiered evaluation, all in one stdlib-only Python script (`hooks/tribunal.py`):
 
 Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `docs/research/2026-09-22-prototype-evidence.md`.
 
-Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no config-file credential path, by decision.
+Stdlib only (`hashlib`, `json`, `math`, `os`, `re`, `sys`, `time`, `urllib.request`) — no pip deps, no config-file credential path, by decision.
 
 ## Where things are
 

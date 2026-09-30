@@ -264,3 +264,9 @@ untrusted. A new `/tribunal:setup-scanning` skill explains default-on scopes, pe
 cost, content-cached skill cost, shell persistence, and verification. The fail-to-human
 invariant applies throughout: malformed verdicts, missing keys, and bounded-screen failures
 cannot allow unreviewed content.
+
+**31. Live check + review fixes.** All eight live Cloudflare smoke cases behaved as designed
+(evidence §6 of the spike doc): exfiltrating skill denied, benign twin allowed, 26 KiB plugin
+skill chunked and allowed in 2.2 s, cache hit in 0.1 s, injected web page warned. Main-thread
+review corrected README wording (a flagged `Skill` call is denied, not "confirmation"), stated
+that skill reference files loaded via `Read` stay unscreened, and updated the stdlib list.
