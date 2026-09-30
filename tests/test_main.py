@@ -147,6 +147,64 @@ class HookContractTests(unittest.TestCase):
         out = json.loads(proc.stdout)
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "allow")
 
+    def test_posttooluse_subprocess_fallback(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            env = {**os.environ, "TRIBUNAL_PROVIDER": "hosted", "TRIBUNAL_API_KEY": "test",
+                   "TRIBUNAL_ENDPOINT": "http://127.0.0.1:1/v1/decide",
+                   "TRIBUNAL_TIMEOUT": "1", "TRIBUNAL_CONFIG": "/nonexistent.json",
+                   "CLAUDE_CONFIG_DIR": os.path.join(td, "config"),
+                   "XDG_CACHE_HOME": os.path.join(td, "cache")}
+            proc = subprocess.run(["python3", SCRIPT], input=json.dumps({
+                "hook_event_name": "PostToolUse", "tool_name": "WebFetch",
+                "tool_response": {"result": "example summary", "code": 200},
+            }), capture_output=True, text=True, env=env)
+            self.assertEqual(proc.returncode, 0)
+            out = json.loads(proc.stdout)
+            msg = out["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("could not be screened", msg)
+            self.assertIn("WebFetch", msg)
+
+    def test_expansion_subprocess_fallback(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            env = {**os.environ, "TRIBUNAL_PROVIDER": "hosted", "TRIBUNAL_API_KEY": "test",
+                   "TRIBUNAL_ENDPOINT": "http://127.0.0.1:1/v1/decide",
+                   "TRIBUNAL_TIMEOUT": "1", "TRIBUNAL_CONFIG": "/nonexistent.json",
+                   "CLAUDE_CONFIG_DIR": os.path.join(td, "config"),
+                   "XDG_CACHE_HOME": os.path.join(td, "cache")}
+            skill_dir = os.path.join(td, "config", "skills", "sample")
+            os.makedirs(skill_dir, exist_ok=True)
+            with open(os.path.join(skill_dir, "SKILL.md"), "w") as f:
+                f.write("---\ndescription: sample\n---\nBody")
+            proc = subprocess.run(["python3", SCRIPT], input=json.dumps({
+                "hook_event_name": "UserPromptExpansion", "command_name": "sample",
+                "cwd": "/tmp",
+            }), capture_output=True, text=True, env=env)
+            self.assertEqual(proc.returncode, 0)
+            out = json.loads(proc.stdout)
+            self.assertEqual(out, {"systemMessage": "tribunal unavailable: URLError"})
+
+    def test_pretooluse_skill_subprocess_fallback(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            env = {**os.environ, "TRIBUNAL_PROVIDER": "hosted", "TRIBUNAL_API_KEY": "test",
+                   "TRIBUNAL_ENDPOINT": "http://127.0.0.1:1/v1/decide",
+                   "TRIBUNAL_TIMEOUT": "1", "TRIBUNAL_CONFIG": "/nonexistent.json",
+                   "CLAUDE_CONFIG_DIR": os.path.join(td, "config"),
+                   "XDG_CACHE_HOME": os.path.join(td, "cache")}
+            skill_dir = os.path.join(td, "config", "skills", "sample")
+            os.makedirs(skill_dir, exist_ok=True)
+            with open(os.path.join(skill_dir, "SKILL.md"), "w") as f:
+                f.write("---\ndescription: sample\n---\nBody")
+            proc = subprocess.run(["python3", SCRIPT], input=json.dumps({
+                "hook_event_name": "PreToolUse", "tool_name": "Skill",
+                "tool_input": {"skill": "sample"}, "cwd": "/tmp",
+            }), capture_output=True, text=True, env=env)
+            self.assertEqual(proc.returncode, 0)
+            out = json.loads(proc.stdout)
+            self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
 
 if __name__ == "__main__":
     unittest.main()
