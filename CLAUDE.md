@@ -31,6 +31,7 @@ Tiered evaluation, all in one stdlib-only Python script (`hooks/tribunal.py`):
 
 1. **Fast path** — safe-tools list + exact built-in Bash commands (`git status`, `pwd`) → `allow` with zero network. Rules JSON can remove but not add built-in fast-path entries. Never prefix/regex-match Bash into auto-allow.
 2. **Jev path** — one POST: `state` (cwd, tool, input) + a single `choice` question whose criteria are the three verdicts. Inputs above 8 KiB go straight to `ask`; never approve based on a truncated view. `answers.verdict.choice` maps via dict lookup; missing/low/invalid confidence → `ask`.
+3. **Content screen** — `PreToolUse` and `UserPromptExpansion` screen resolved skill/command files; `PostToolUse` screens `WebFetch` and `WebSearch` results. `TRIBUNAL_SCAN` enables `skills`, `web`, both (the default for unset or invalid values), or `off`. Content is UTF-8 chunked; the worst verdict wins. Clean skill files are content-address cached; unresolved skill names retain the regular tool-call verdict. Web content is warned about, never replaced.
 
 Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `docs/research/2026-09-22-prototype-evidence.md`.
 
@@ -41,8 +42,12 @@ Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no co
 - `hooks/tribunal.py` — main hook script
 - `hooks/validator.py` — backwards-compatibility alias for `hooks/tribunal.py`
 - `skills/setup-cloudflare/SKILL.md` — setup skill (`/tribunal:setup-cloudflare`)
+- `skills/setup-scanning/SKILL.md` — setup skill (`/tribunal:setup-scanning`)
 - `docs/plans/2026-09-22-custom-command-validator-design.md` — PRD (historical decisions + rationale)
 - `docs/plans/2026-09-22-custom-command-validator.md` — original implementation plan
+- `docs/plans/2026-09-30-content-screen-design.md` — content-screen design (spike findings + decisions)
+- `docs/plans/2026-09-30-content-screen-plan.md` — content-screen implementation plan
+- `docs/research/2026-09-30-content-screen-spike.md` — live-captured hook payload evidence for skills/web
 - `docs/research/2026-09-22-research-findings.md` — verified hook contract + jev API facts
 - `docs/research/2026-09-22-prototype-evidence.md` — live-captured wire-contract evidence
 - `JOURNEY.md` — chronological decision log. **Refresh it before every commit that carries a meaningful change** — the JOURNEY entry lands in the same commit as the change it describes.

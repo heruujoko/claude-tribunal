@@ -254,3 +254,13 @@ file on disk in PreToolUse / UserPromptExpansion; web results are warned about, 
 `TRIBUNAL_SCAN` (unset or invalid → both scopes, `off` → none); reuse the live-proven `choice`
 verdict shape instead of `noul`; chunk instead of truncate (worst chunk wins); cache only
 clean skill verdicts, keyed by content; an unresolvable skill keeps today's name-only verdict.
+
+**30. Implementation.** The seven TDD tasks landed in seven commits. Tribunal now resolves
+and screens on-disk user, project, and plugin skill files for `PreToolUse` and
+`UserPromptExpansion`; clean results use a content-addressed cache, while rejected or uncertain
+content is always re-screened. `PostToolUse` warns rather than replaces `WebFetch` and
+`WebSearch` results, preserving original content while instructing Claude to treat it as
+untrusted. A new `/tribunal:setup-scanning` skill explains default-on scopes, per-result web
+cost, content-cached skill cost, shell persistence, and verification. The fail-to-human
+invariant applies throughout: malformed verdicts, missing keys, and bounded-screen failures
+cannot allow unreviewed content.

@@ -16,10 +16,11 @@ Like the Living Tribunal's three-faced judgment, every action is weighed into on
 
 ## How It Works
 
-Tribunal operates in two evaluation tiers:
+Tribunal operates in three evaluation tiers:
 
 1. **Fast Path (0 ms, 0 network):** Safe read-only inspection tools (`Read`, `Glob`, `Grep`, Task tools) and exact harmless shell commands (`git status`, `pwd`) are immediately approved locally without making a network call.
 2. **Jev SLM Path:** Any tool call outside the fast path is dispatched to a fast small language model (`jev`) on your configured provider (Hosted or Cloudflare Workers AI) with structured evaluation criteria. The model's typed answer is mapped directly to Claude Code's permission system.
+3. **Content Screen:** Screens skill files and web results independently of tool-call adjudication. Its verdict can block a skill, require confirmation, or warn Claude that a web result is untrusted.
 
 ### Core Invariant: Fail-to-Human
 
@@ -27,6 +28,27 @@ Tribunal is designed around strict defensive defaults:
 * **Fail-to-Human:** If an API token is missing, the endpoint is unreachable, an envelope is malformed, or model confidence falls below the threshold, Tribunal falls back to `ask`. It **never** fails open into an auto-allow.
 * **Auto Mode Override:** In Claude Code auto mode, a hook decision of `ask` forces an interactive confirmation prompt.
 * **Input Bounds:** Inputs exceeding 8 KiB bypass SLM evaluation and require human review directly.
+
+---
+
+## Content Screening
+
+Tribunal screens prompt content and tool outputs across three hook events:
+
+- **Skills (`PreToolUse` on `Skill` & `UserPromptExpansion`):** Screens the backing `.md` skill files from your user, project, or installed plugin directories before their instructions reach the context window. Clean skill files are cached by content hash; unsafe skills are blocked (`UserPromptExpansion`) or require confirmation (`PreToolUse`).
+- **Web (`PostToolUse` on `WebFetch` & `WebSearch`):** Screens fetched web content for prompt injection and hidden instructions. Flagged content appends an untrusted-data warning context for Claude, never replaces or hides original text.
+
+Both scopes are **on by default** with no additional configuration.
+
+To configure or disable scanning scopes, run the bundled setup skill:
+
+```bash
+/tribunal:setup-scanning
+```
+
+### Content Screening Limitations & Cost
+- **Cost:** One jev SLM call per web fetch/search result. Skills are content-addressed and cached upon clean verdict; repeated invocations cost zero additional SLM calls until file modification.
+- **Scope Limits:** Small language models catch overt prompt injection and unauthorized instruction escapes. Direct filesystem inspection (`Read` of skill reference files outside the skill command workflow) is governed by fast-path/tool-use validation, not prompt screening.
 
 ---
 
@@ -104,6 +126,7 @@ export TRIBUNAL_API_KEY=<your-api-key>
 | `TRIBUNAL_MODEL` | Decision model ID | `jev-latest` (`typesafe/jev` for Cloudflare) |
 | `TRIBUNAL_TIMEOUT` | Request timeout in seconds | `10` |
 | `TRIBUNAL_MIN_CONFIDENCE` | Minimum confidence threshold (`0.0` to `1.0`) below which verdicts fall back to `ask` | `0.5` |
+| `TRIBUNAL_SCAN` | Content screening scopes: `skills,web` (both), `skills`, `web`, or `off` | `skills,web` |
 | `TRIBUNAL_CONFIG` | Path to custom rules JSON file | `${PLUGIN_ROOT}/config.json` |
 
 *(Note: Legacy `TRIBUNAL_JEV_URL`, `JEV_API_KEY`, and `CCV_*` environment variables remain supported for backwards compatibility.)*
