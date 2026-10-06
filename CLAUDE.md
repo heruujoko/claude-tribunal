@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Claude Code **plugin** (`tribunal`) whose `PreToolUse` hook (matcher `*`) adjudicates every tool call through **jev** — TypeSafe AI's typed-decision model. Every tool call gets one of three verdicts mapped to Claude Code's `permissionDecision`:
+A Claude Code **plugin** (`tribunal`) whose native `classic.PreToolUse` adapter adjudicates tool calls through **jev** — TypeSafe AI's typed-decision model. Requires mod-capable Claude Code (terminal v2.1.287+, tested v2.1.289). Calls already restricted by downstream hooks keep that restriction. Jev verdicts map to Claude Code's permission decisions:
 
 | jev `choice` | Hook output | Effect |
 |---|---|---|
@@ -17,7 +17,10 @@ A Claude Code **plugin** (`tribunal`) whose `PreToolUse` hook (matcher `*`) adju
 ## Commands
 
 ```bash
-python3 -m unittest discover -s tests -v   # full test suite
+python3 -m unittest discover -s tests -v   # Python regressions
+claude plugin test .                       # native adapter regressions
+claude plugin validate .
+python3 tests/check_native_permissions.py  # real engine, local mock providers
 ```
 
 Credentials are **env-only — nothing reads a config file for keys, creds never touch this repo's disk**:
@@ -27,10 +30,14 @@ Credentials are **env-only — nothing reads a config file for keys, creds never
 
 ## Architecture
 
-Tiered evaluation, all in one stdlib-only Python script (`hooks/tribunal.py`):
+Tiered evaluation in a stdlib-only Python script (`hooks/tribunal.py`), invoked by the thin native adapter (`hooks/register.ts`):
 
 1. **Fast path** — safe-tools list + exact built-in Bash commands (`git status`, `pwd`) → `allow` with zero network. Rules JSON can remove but not add built-in fast-path entries. Never prefix/regex-match Bash into auto-allow.
 2. **Jev path** — one POST: `state` (cwd, tool, input) + a single `choice` question whose criteria are the three verdicts. Inputs above 8 KiB go straight to `ask`; never approve based on a truncated view. `answers.verdict.choice` maps via dict lookup; missing/low/invalid confidence → `ask`.
+
+For a valid, sufficiently confident `human_ask` only, the adapter queries `$.tool.check` on the full effective input (including downstream rewrites). An `allow` with a nonempty explicit matching `rule` removes Tribunal's ask and defers to native permissions. No mode-only consent, approval cache, settings parsing, or settings writes. Failures and low-confidence asks are never eligible. Preserve other hooks' asks/denials and context. Adapter/process/query failures force `ask`; module-load failures cannot run that fallback, so loading must be verified.
+
+The integration fixture uses normal model-initiated calls: plugin-origin `$.tool.call` deliberately discards permission updates in v2.1.289, so it cannot prove approval persistence. Actual interactive dialogs remain outside the automated check.
 
 Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` inside `input` on the request **and** nests the response at `result.result.answers` (live-proven); the `answers.verdict` shape itself is identical, so mapping is provider-independent. Evidence: `docs/research/2026-09-22-prototype-evidence.md`.
 
@@ -38,7 +45,8 @@ Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no co
 
 ## Where things are
 
-- `hooks/tribunal.py` — main hook script
+- `hooks/register.ts` — native permission-aware adapter (automatic registration)
+- `hooks/tribunal.py` — Python evaluator; `--native` includes ask eligibility, default retains classic JSON
 - `hooks/validator.py` — backwards-compatibility alias for `hooks/tribunal.py`
 - `skills/setup-cloudflare/SKILL.md` — setup skill (`/tribunal:setup-cloudflare`)
 - `docs/plans/2026-09-22-custom-command-validator-design.md` — PRD (historical decisions + rationale)
@@ -49,6 +57,6 @@ Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no co
 
 ## Conventions
 
-- Plugin hook registration uses exec form (`"command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/tribunal.py"]`, `timeout: 30`) — never shell form.
+- Automatic registration is `{"modules": ["./register.ts"]}` in `hooks/hooks.json`, an explicit exception to the original Python-only registration. Invoke Python via `$.process.run` with an argument vector and 30-second timeout, never a shell. Do not also register the classic Python hook (duplicate adjudication). Older clients cannot run automatic Tribunal protection; direct classic invocation remains compatible but cannot respect saved permissions.
 - Verified hook facts worth trusting from research docs: hook `ask` forces the prompt even in auto mode; deny reasons go to Claude, allow/ask reasons to the user only; exit 0 + no stdout = no decision.
 - Install route is a marketplace: repo-root `.claude-plugin/marketplace.json` → `/plugin marketplace add heruujoko/claude-tribunal` (or local clone path) → `/plugin install tribunal@claude-tribunal`.
