@@ -23,7 +23,7 @@ Tribunal operates in two evaluation tiers:
 
 ### Respecting Saved Permissions
 
-A sufficiently confident Jev `human_ask` does not prompt again when Claude Code's native permission checker returns **allow with a matching explicit rule**. This includes saved permissions (such as “Yes, and don't ask again”) and explicit session rules, within the scope and lifetime Claude Code assigns them. A one-time Yes creates no reusable Tribunal permission.
+A sufficiently confident Jev `human_ask` does not prompt again when Claude Code's native permission checker returns **allow with a matching explicit rule**. This includes saved permissions (such as “Yes, and don't ask again”) and explicit session rules, and allow rules from user, project (once the workspace is trusted) and local settings, within the scope and lifetime Claude Code assigns them. A one-time Yes creates no reusable Tribunal permission.
 
 Tribunal still evaluates the call: Jev rejection, low confidence, provider failure, and input-budget failures cannot be bypassed by a saved rule. Mode-only approval and built-in read-only approval are not saved consent. Other hooks' asks/denials and native deny/ask rules remain effective. Tribunal does not parse settings, cache approvals, or infer consent from successful execution.
 
@@ -149,4 +149,4 @@ claude plugin validate .
 python3 tests/check_native_permissions.py
 ```
 
-The integration check requires Claude Code v2.1.289+ and runs normal model-initiated calls against local mock model/Jev endpoints in a temporary project, without real provider credentials or spend. It checks saved-rule scope, compound calls, deny/ask precedence, session expiry, one-time approval, local persistence, and rule removal. PermissionRequest hooks simulate approval responses; actual interactive “Yes” dialogs are not covered.
+The integration check requires Claude Code v2.1.289+ and runs normal model-initiated calls against local mock model/Jev endpoints in a temporary project, without real provider credentials or spend. It checks saved-rule scope, compound calls, deny/ask precedence, session expiry, one-time approval, user/project/local settings levels (including untrusted-workspace and disabled-source cases), and rule removal. PermissionRequest hooks simulate approval responses; actual interactive “Yes” dialogs are not covered.

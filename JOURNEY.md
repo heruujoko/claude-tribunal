@@ -276,3 +276,8 @@ integration check covers saved-rule scope, compound commands, deny/ask precedenc
 session expiry, one-time approvals, local persistence, and rule removal. The configured
 macOS wiki path is unavailable on this Linux machine; learnings remain here.
 
+**32. Settings levels now verified, not inferred.** The integration check gained user-level
+(throwaway `CLAUDE_CONFIG_DIR`, real `~/.claude` untouched) and project-level cases, plus
+project-deny-beats-user-allow and a disabled-source case. It found that project allow
+rules are dropped until the workspace is trusted, so Tribunal's ask stays in an untrusted
+workspace; documented in the README. Main-thread run: all checks pass.

@@ -104,7 +104,11 @@ def main():
             env = {k: v for k, v in os.environ.items()
                    if not k.startswith(('TRIBUNAL_', 'CCV_', 'CLOUDFLARE_', 'CLAUDE', 'ANTHROPIC_'))
                    and k != 'JEV_API_KEY'}
-            env.update(TRIBUNAL_PROVIDER='hosted', TRIBUNAL_API_KEY='local-fixture',
+            # Throwaway user config dir: user-level settings never touch the real ~/.claude.
+            home = project / 'home'
+            (home / '.claude').mkdir(parents=True)
+            env.update(HOME=str(home), CLAUDE_CONFIG_DIR=str(home / '.claude'),
+                       TRIBUNAL_PROVIDER='hosted', TRIBUNAL_API_KEY='local-fixture',
                        TRIBUNAL_ENDPOINT=endpoint + '/decide',
                        TRIBUNAL_CONFIG=str(project / 'no-config.json'),
                        ANTHROPIC_API_KEY='local-fixture', ANTHROPIC_BASE_URL=endpoint,
@@ -169,6 +173,36 @@ def main():
                     assert 'rule' not in second['permission'], second
                 assert 'ask' in run()[0]['observed'], 'approval survived session end'
                 print(f'PASS: {approval} approval and fresh-session expiry')
+
+            def write(path, permissions):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps({'permissions': permissions}))
+
+            user = home / '.claude/settings.json'
+            shared = project / '.claude/settings.json'
+            for name, files, sources, expected in [
+                ('user-level allow', [(user, {'allow': [rule]})], 'user', 'allow'),
+                ('project-level allow in untrusted workspace', [(shared, {'allow': [rule]})],
+                 'project', 'ask'),
+                ('project-level allow', [(shared, {'allow': [rule]})], 'project', 'allow'),
+                ('project deny beats user allow',
+                 [(user, {'allow': [rule]}), (shared, {'deny': [rule]})], 'user,project', 'deny'),
+                ('user allow ignored when source disabled', [(user, {'allow': [rule]})], '', 'ask'),
+            ]:
+                for path, permissions in files:
+                    write(path, permissions)
+                # Claude Code drops project allow rules until the workspace is trusted.
+                trusted = 'untrusted' not in name
+                (home / '.claude/.claude.json').write_text(json.dumps({'projects': {
+                    str(project): {'hasTrustDialogAccepted': trusted}}}))
+                result = run(sources=sources)[0]
+                assert result['permission']['decision'] == expected, (name, result)
+                assert ('ask' in result['observed']) == (expected != 'allow'), (name, result)
+                if expected == 'allow':
+                    assert result['permission']['rule'] == rule, (name, result)
+                user.unlink(missing_ok=True)
+                shared.unlink(missing_ok=True)
+                print(f'PASS: {name}')
 
             result = run(approval='localSettings', sources='local')
             assert result[1]['permission']['rule'] == rule, result
