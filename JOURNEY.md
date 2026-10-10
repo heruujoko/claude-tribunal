@@ -239,3 +239,45 @@ convene the Tribunal to offload open-ended structured decisions to the SLM.
 - Test suite updated to 55 unit tests (53 passed, 2 skipped due to optional shells),
   covering new `TRIBUNAL_*` env handling, precedence over `CCV_*`, and legacy wrapper execution.
 
+## 2026-10-06 — Respect explicit native permissions
+
+**28. Repeated asks were hook semantics, not missing approval storage.** A fresh
+Tribunal `ask` forces another prompt even when Claude Code has an explicit allow
+rule. The user chose saved/session permissions, not a cache of one-time Yes answers.
+Classic hook input cannot expose the effective native permission result. Automatic
+registration now uses a thin native `classic.PreToolUse` adapter; the Python provider
+core remains stdlib-only, with its default classic contract and legacy alias intact.
+This requires mod-capable clients (terminal v2.1.287+, tested v2.1.289); older clients
+cannot load the automatic registration and must upgrade.
+
+**29. Narrow deferral, fail-to-human preserved.** Only a well-formed, sufficiently
+confident Jev `human_ask` may defer to `$.tool.check` returning allow with a nonempty
+explicit matching rule. Mode/built-in allows are not consent. Jev rejects, low
+confidence, oversized input, provider/config errors, and adapter/query/process errors
+keep their restriction. Downstream asks/denials and full rewritten input/context are
+preserved. No settings parser, approval cache, new dependencies, or credential files.
+Module-load failures precede handler error recovery, so loading must be verified.
+
+**30. The integration test was initially testing the wrong caller.** In v2.1.289,
+plugin-origin `$.tool.call` deliberately discards permission updates; simulated
+PermissionRequest approvals succeeded once but created no reusable permission.
+Installed-engine source and debug traces located this boundary. The corrected check
+uses normal model-initiated calls through a local deterministic Messages fixture and
+local Jev fixture, without real provider credentials or spend. Explicit session rules
+then match on the second call and expire in a fresh session; one-time approvals keep
+asking; local saved rules persist and removal restores asks. Disabling local settings
+sources also prevents a persisted local rule from being effective, so persistence
+checks explicitly enable that source. Actual interactive dialog clicks remain untested.
+
+**31. Verification.** Main-thread runs: Python 58 passed / 1 skipped (fish unavailable),
+native adapter 21 passed, real-engine lifecycle 10 checks passed, and plugin validation
+passed with one warning (root CLAUDE.md is not shipped context). The
+integration check covers saved-rule scope, compound commands, deny/ask precedence,
+session expiry, one-time approvals, local persistence, and rule removal. The configured
+macOS wiki path is unavailable on this Linux machine; learnings remain here.
+
+**32. Settings levels now verified, not inferred.** The integration check gained user-level
+(throwaway `CLAUDE_CONFIG_DIR`, real `~/.claude` untouched) and project-level cases, plus
+project-deny-beats-user-allow and a disabled-source case. It found that project allow
+rules are dropped until the workspace is trusted, so Tribunal's ask stays in an untrusted
+workspace; documented in the README. Main-thread run: all checks pass.

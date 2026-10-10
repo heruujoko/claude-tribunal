@@ -21,6 +21,12 @@ Tribunal operates in two evaluation tiers:
 1. **Fast Path (0 ms, 0 network):** Safe read-only inspection tools (`Read`, `Glob`, `Grep`, Task tools) and exact harmless shell commands (`git status`, `pwd`) are immediately approved locally without making a network call.
 2. **Jev SLM Path:** Any tool call outside the fast path is dispatched to a fast small language model (`jev`) on your configured provider (Hosted or Cloudflare Workers AI) with structured evaluation criteria. The model's typed answer is mapped directly to Claude Code's permission system.
 
+### Respecting Saved Permissions
+
+A sufficiently confident Jev `human_ask` does not prompt again when Claude Code's native permission checker returns **allow with a matching explicit rule**. This includes saved permissions (such as “Yes, and don't ask again”) and explicit session rules, and allow rules from user, project (once the workspace is trusted) and local settings, within the scope and lifetime Claude Code assigns them. A one-time Yes creates no reusable Tribunal permission.
+
+Tribunal still evaluates the call: Jev rejection, low confidence, provider failure, and input-budget failures cannot be bypassed by a saved rule. Mode-only approval and built-in read-only approval are not saved consent. Other hooks' asks/denials and native deny/ask rules remain effective. Tribunal does not parse settings, cache approvals, or infer consent from successful execution.
+
 ### Core Invariant: Fail-to-Human
 
 Tribunal is designed around strict defensive defaults:
@@ -31,6 +37,12 @@ Tribunal is designed around strict defensive defaults:
 ---
 
 ## Installation
+
+**Requires Python 3 and mod-capable Claude Code: terminal v2.1.287+ (tested on v2.1.289), or Desktop Code tab engine v2.1.286+.** Automatic adjudication uses a native function-hook adapter around the stdlib-only Python evaluator. Older clients cannot load this registration and therefore have **no automatic Tribunal protection**; upgrade before using it.
+
+Module-load failure happens before the adapter's fail-to-human handler can run. For a clone, run `claude plugin validate /path/to/claude-tribunal`; expect `./register.ts` with `classic.PreToolUse`. After installing/reloading, use `claude --debug` to confirm the Tribunal hooks module loaded. Validation alone does not prove it loaded in your session.
+
+Direct invocation of `python3 hooks/tribunal.py` (and the legacy `hooks/validator.py` alias) retains the classic JSON contract for custom command-hook setups, but cannot inspect native permissions and still repeats `human_ask` prompts. Do not register it alongside the module: that would adjudicate twice.
 
 ### For External Testers (Direct from GitHub)
 
@@ -128,8 +140,13 @@ You can customize the local fast path by providing a `config.json` (or pointing 
 
 ## Running Tests
 
-Tribunal uses Python 3 standard library only (`unittest`, `urllib`, `json`) with no external pip dependencies:
+The Python evaluator uses only the standard library; the TypeScript adapter uses Claude Code's built-in API. No pip or npm dependencies are required.
 
 ```bash
 python3 -m unittest discover -s tests -v
+claude plugin test .
+claude plugin validate .
+python3 tests/check_native_permissions.py
 ```
+
+The integration check requires Claude Code v2.1.289+ and runs normal model-initiated calls against local mock model/Jev endpoints in a temporary project, without real provider credentials or spend. It checks saved-rule scope, compound calls, deny/ask precedence, session expiry, one-time approval, user/project/local settings levels (including untrusted-workspace and disabled-source cases), and rule removal. PermissionRequest hooks simulate approval responses; actual interactive “Yes” dialogs are not covered.

@@ -1,17 +1,3 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/tribunal.py"],
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
+  "modules": ["./register.ts"]
 }

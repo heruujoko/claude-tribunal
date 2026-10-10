@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse hook: ask a jev decide endpoint to verdict each tool call.
 
-Outputs Claude Code control JSON on stdout. Any internal failure exits
-non-blocking (exit 1) so Claude Code's native permission flow stays in charge.
+Outputs classic control JSON, or a verdict with saved-permission eligibility
+under --native. Known failures ask; unexpected failures exit 1 (the native
+adapter turns process failures into ask; classic invocation remains non-blocking).
 """
 import json
 import math
@@ -163,30 +164,42 @@ def real_post(body, cfg):
     return extract_answer(data, cfg["provider"])
 
 
-def evaluate(payload, cfg, post):
-    """Tool-call payload -> (permissionDecision, reason). post(body, cfg) -> answers.verdict."""
+def evaluate_native(payload, cfg, post):
+    """Return decision, reason, and whether explicit native consent may resolve an ask."""
     tool = payload.get("tool_name", "")
     if tool in cfg["safe_tools"]:
-        return "allow", "fast path: safe tool"
+        return "allow", "fast path: safe tool", False
     if tool == "Bash":
         cmd = (payload.get("tool_input") or {}).get("command", "")
         if cmd in cfg["safe_commands"]:
-            return "allow", "fast path: safe command"
+            return "allow", "fast path: safe command", False
     raw = json.dumps(payload.get("tool_input", {}), default=str, ensure_ascii=False)
     if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
-        return "ask", "tool input exceeds tribunal budget"
+        return "ask", "tool input exceeds tribunal budget", False
     if not cfg["api_key"]:
-        return "ask", "provider API key not set"
+        return "ask", "provider API key not set", False
     answer = post(build_request(payload, cfg), cfg)
     decision = map_answer(answer, cfg["min_confidence"])
     if decision is None:
-        return "ask", "unusable jev answer"
+        return "ask", "unusable jev answer", False
     choice = answer.get("choice")
     confidence = answer.get("confidence")
-    return decision, f"jev: {choice} (confidence {confidence})"
+    eligible = (choice == "human_ask" and type(confidence) in (int, float)
+                and math.isfinite(confidence) and cfg["min_confidence"] <= confidence <= 1)
+    return decision, f"jev: {choice} (confidence {confidence})", eligible
 
 
-def emit(decision, reason=""):
+def evaluate(payload, cfg, post):
+    """Classic hook contract: (permissionDecision, reason)."""
+    return evaluate_native(payload, cfg, post)[:2]
+
+
+def emit(decision, reason="", respect_saved_permission=False):
+    if sys.argv[1:] == ["--native"]:
+        json.dump({"decision": decision, "reason": reason,
+                   "respect_saved_permission": respect_saved_permission}, sys.stdout)
+        sys.stdout.write("\n")
+        return
     json.dump({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": decision,
@@ -203,8 +216,7 @@ def main():
         sys.exit(1)
 
     try:
-        decision, reason = evaluate(payload, load_config(), real_post)
-        emit(decision, reason)
+        emit(*evaluate_native(payload, load_config(), real_post))
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Known config/provider/transport errors should force a human prompt.
         emit("ask", f"tribunal unavailable: {type(exc).__name__}")
