@@ -34,6 +34,16 @@ Tribunal is designed around strict defensive defaults:
 * **Auto Mode Override:** In Claude Code auto mode, a hook decision of `ask` forces an interactive confirmation prompt.
 * **Input Bounds:** Inputs exceeding 8 KiB bypass SLM evaluation and require human review directly.
 
+### Evaluation Profiles
+
+Tribunal ships with three built-in evaluation profiles that provide workflow context to Jev:
+
+- **developer** (default): Software development routine — builds, tests, linters, bounded delegation, non-force pushes to feature branches
+- **office-design**: Document/spreadsheet/slide work — scoped file editing and export
+- **browsing**: Public read-only web retrieval — no account actions, publishing, or uploads
+
+Profiles provide context, not security exemptions. Immutable security guidance is always included. Selection is global across all Tribunal sessions and stored in `~/.claude/tribunal/profiles.json`. Use the `/tribunal:profile` skill to switch profiles. Corrupt or invalid profile storage triggers fail-to-human.
+
 ---
 
 ## Installation

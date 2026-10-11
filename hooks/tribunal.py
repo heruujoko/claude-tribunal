@@ -11,6 +11,10 @@ import os
 import sys
 import urllib.request
 
+# Import profiles from the same directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import profiles
+
 CHOICE_MAP = {"allowed": "allow", "rejected": "deny", "human_ask": "ask"}
 MAX_INPUT_BYTES = 8192
 DEFAULT_ENDPOINT = "https://jevtypesafeai.com/api/v1/decide"
@@ -18,12 +22,8 @@ DEFAULT_JEV_URL = DEFAULT_ENDPOINT  # backwards compatibility alias
 DEFAULT_SAFE_TOOLS = ["Read", "Glob", "Grep", "TodoWrite",
                       "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 DEFAULT_SAFE_COMMANDS = ["git status", "pwd"]
-VERDICT_INSTRUCTIONS = (
-    "Should an AI agent be allowed to run this tool call on the user's machine? "
-    "Pick human_ask when uncertain or when a human should decide."
-)
 VERDICT_CRITERIA = {
-    "allowed": "clearly safe and reversible for this machine",
+    "allowed": "clearly safe, bounded, and routine for this profile",
     "rejected": "clearly unsafe, destructive, or against the user's interest",
     "human_ask": "uncertain, sensitive, or needing human judgment",
 }
@@ -114,18 +114,24 @@ def map_answer(answer, min_confidence):
     return decision
 
 
-def build_request(payload, cfg):
+def build_request(payload, cfg, profile=None):
     tool = payload.get("tool_name", "")
     raw = json.dumps(payload.get("tool_input", {}), default=str, ensure_ascii=False)
     if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
         raise ValueError("tool input exceeds tribunal budget")
     # evaluate() returns ask before calling this builder when the input is too large.
+    if profile is None:
+        profile = profiles.load()
+    instructions = profiles.SECURITY + " " + profile["guidance"]
+    state = {"cwd": payload.get("cwd", ""), "tool": tool, "input": raw}
+    if profile["custom"] is not None:
+        state["custom_profile"] = profile["custom"]
     core = {
-        "state": {"cwd": payload.get("cwd", ""), "tool": tool, "input": raw},
+        "state": state,
         "questions": {
             "verdict": {
                 "type": "choice",
-                "instructions": VERDICT_INSTRUCTIONS,
+                "instructions": instructions,
                 "criteria": VERDICT_CRITERIA,
             }
         },
@@ -164,8 +170,10 @@ def real_post(body, cfg):
     return extract_answer(data, cfg["provider"])
 
 
-def evaluate_native(payload, cfg, post):
+def evaluate_native(payload, cfg, post, profile=None):
     """Return decision, reason, and whether explicit native consent may resolve an ask."""
+    if profile is None:
+        profile = profiles.load()  # raises on corrupt storage -> ask via main()
     tool = payload.get("tool_name", "")
     if tool in cfg["safe_tools"]:
         return "allow", "fast path: safe tool", False
@@ -178,7 +186,7 @@ def evaluate_native(payload, cfg, post):
         return "ask", "tool input exceeds tribunal budget", False
     if not cfg["api_key"]:
         return "ask", "provider API key not set", False
-    answer = post(build_request(payload, cfg), cfg)
+    answer = post(build_request(payload, cfg, profile=profile), cfg)
     decision = map_answer(answer, cfg["min_confidence"])
     if decision is None:
         return "ask", "unusable jev answer", False
@@ -189,9 +197,9 @@ def evaluate_native(payload, cfg, post):
     return decision, f"jev: {choice} (confidence {confidence})", eligible
 
 
-def evaluate(payload, cfg, post):
+def evaluate(payload, cfg, post, profile=None):
     """Classic hook contract: (permissionDecision, reason)."""
-    return evaluate_native(payload, cfg, post)[:2]
+    return evaluate_native(payload, cfg, post, profile=profile)[:2]
 
 
 def emit(decision, reason="", respect_saved_permission=False):

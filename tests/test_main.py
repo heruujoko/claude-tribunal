@@ -3,6 +3,7 @@ import io
 import json
 import os
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -12,8 +13,17 @@ SCRIPT = "hooks/tribunal.py"
 
 
 def run_hook(stdin_text):
-    env = {**os.environ, "TRIBUNAL_PROVIDER": "hosted", "JEV_API_KEY": "",
-           "TRIBUNAL_CONFIG": "/nonexistent.json"}
+    # Filter out all credential and config variables to ensure clean test environment
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("HOME", "CLAUDE_CONFIG_DIR", "TRIBUNAL_API_KEY",
+                        "JEV_API_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+                        "TRIBUNAL_ENDPOINT", "TRIBUNAL_JEV_URL", "CCV_JEV_URL",
+                        "CCV_CONFIG", "CCV_PROVIDER", "CCV_TIMEOUT", "CCV_MIN_CONFIDENCE",
+                        "TRIBUNAL_TIMEOUT", "TRIBUNAL_MIN_CONFIDENCE", "TRIBUNAL_CONFIG",
+                        "TRIBUNAL_PROVIDER")}
+    env.update({"HOME": tempfile.mkdtemp(),
+                "TRIBUNAL_PROVIDER": "hosted", "JEV_API_KEY": "",
+                "TRIBUNAL_CONFIG": "/nonexistent.json"})
     return subprocess.run(["python3", SCRIPT], input=stdin_text,
                           capture_output=True, text=True, env=env)
 
@@ -40,7 +50,15 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
 
     def test_invalid_provider_asks_explicitly(self):
-        env = {**os.environ, "CCV_PROVIDER": "typo", "JEV_API_KEY": ""}
+        # Filter out all credential and config variables to ensure clean test environment
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("HOME", "CLAUDE_CONFIG_DIR", "TRIBUNAL_API_KEY",
+                            "JEV_API_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+                            "TRIBUNAL_ENDPOINT", "TRIBUNAL_JEV_URL", "CCV_JEV_URL",
+                            "CCV_CONFIG", "CCV_PROVIDER", "CCV_TIMEOUT", "CCV_MIN_CONFIDENCE",
+                            "TRIBUNAL_TIMEOUT", "TRIBUNAL_MIN_CONFIDENCE", "TRIBUNAL_CONFIG",
+                            "TRIBUNAL_PROVIDER")}
+        env.update({"HOME": tempfile.mkdtemp(), "CCV_PROVIDER": "typo", "JEV_API_KEY": ""})
         proc = subprocess.run(["python3", SCRIPT], input=json.dumps(
             {"tool_name": "Write", "tool_input": {}, "cwd": "/tmp"}),
             capture_output=True, text=True, env=env)
@@ -49,9 +67,11 @@ class HookContractTests(unittest.TestCase):
                          ["permissionDecision"], "ask")
 
     def test_missing_cloudflare_account_asks_before_network(self):
-        env = {**os.environ, "CCV_PROVIDER": "cloudflare",
-               "CLOUDFLARE_ACCOUNT_ID": "", "CLOUDFLARE_API_TOKEN": "test",
-               "CCV_CONFIG": "/nonexistent.json"}
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("HOME", "CLAUDE_CONFIG_DIR")}
+        env.update({"HOME": tempfile.mkdtemp(), "CCV_PROVIDER": "cloudflare",
+                    "CLOUDFLARE_ACCOUNT_ID": "", "CLOUDFLARE_API_TOKEN": "test",
+                    "CCV_CONFIG": "/nonexistent.json"})
         proc = subprocess.run(["python3", SCRIPT], input=json.dumps(
             {"tool_name": "Write", "tool_input": {}, "cwd": "/tmp"}),
             capture_output=True, text=True, env=env)
@@ -60,8 +80,10 @@ class HookContractTests(unittest.TestCase):
                          ["permissionDecision"], "ask")
 
     def test_invalid_numeric_setting_asks_explicitly(self):
-        env = {**os.environ, "CCV_PROVIDER": "hosted", "CCV_TIMEOUT": "oops",
-               "CCV_CONFIG": "/nonexistent.json"}
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("HOME", "CLAUDE_CONFIG_DIR")}
+        env.update({"HOME": tempfile.mkdtemp(), "CCV_PROVIDER": "hosted", "CCV_TIMEOUT": "oops",
+                    "CCV_CONFIG": "/nonexistent.json"})
         proc = subprocess.run(["python3", SCRIPT], input=json.dumps(
             {"tool_name": "Write", "tool_input": {}, "cwd": "/tmp"}),
             capture_output=True, text=True, env=env)
@@ -70,9 +92,17 @@ class HookContractTests(unittest.TestCase):
                          ["permissionDecision"], "ask")
 
     def test_hosted_transport_failure_asks(self):
-        env = {**os.environ, "CCV_PROVIDER": "hosted", "JEV_API_KEY": "test",
-               "CCV_JEV_URL": "http://127.0.0.1:1/v1/decide",
-               "CCV_TIMEOUT": "1", "CCV_CONFIG": "/nonexistent.json"}
+        # Filter out all credential and config variables to ensure clean test environment
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("HOME", "CLAUDE_CONFIG_DIR", "TRIBUNAL_API_KEY",
+                            "JEV_API_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+                            "TRIBUNAL_ENDPOINT", "TRIBUNAL_JEV_URL", "CCV_JEV_URL",
+                            "CCV_CONFIG", "CCV_PROVIDER", "CCV_TIMEOUT", "CCV_MIN_CONFIDENCE",
+                            "TRIBUNAL_TIMEOUT", "TRIBUNAL_MIN_CONFIDENCE", "TRIBUNAL_CONFIG",
+                            "TRIBUNAL_PROVIDER")}
+        env.update({"HOME": tempfile.mkdtemp(), "CCV_PROVIDER": "hosted", "JEV_API_KEY": "test",
+                    "CCV_JEV_URL": "http://127.0.0.1:1/v1/decide",
+                    "CCV_TIMEOUT": "1", "CCV_CONFIG": "/nonexistent.json"})
         proc = subprocess.run(["python3", SCRIPT], input=json.dumps(
             {"tool_name": "Write", "tool_input": {}, "cwd": "/tmp"}),
             capture_output=True, text=True, env=env)
@@ -121,12 +151,14 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual(err.getvalue(), "tribunal: RuntimeError\n")
 
     def test_malformed_rules_file_asks(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "config.json")
             with open(path, "w") as f:
                 f.write("not json")
-            env = {**os.environ, "CCV_PROVIDER": "hosted", "CCV_CONFIG": path}
+            env = {k: v for k, v in os.environ.items()
+                   if k not in ("HOME", "CLAUDE_CONFIG_DIR")}
+            env.update({"HOME": tempfile.mkdtemp(), "CCV_PROVIDER": "hosted",
+                        "CCV_CONFIG": path})
             proc = subprocess.run(["python3", SCRIPT], input=json.dumps(
                 {"tool_name": "Write", "tool_input": {}, "cwd": "/tmp"}),
                 capture_output=True, text=True, env=env)
@@ -136,13 +168,15 @@ class HookContractTests(unittest.TestCase):
 
 
     def test_legacy_validator_script_wrapper(self):
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("HOME", "CLAUDE_CONFIG_DIR")}
+        env.update({"HOME": tempfile.mkdtemp(), "TRIBUNAL_PROVIDER": "hosted",
+                    "JEV_API_KEY": "", "TRIBUNAL_CONFIG": "/nonexistent.json"})
         proc = subprocess.run(["python3", "hooks/validator.py"],
                               input=json.dumps({"tool_name": "Read",
                                                 "tool_input": {"file_path": "/tmp/x"},
                                                 "cwd": "/tmp"}),
-                              capture_output=True, text=True,
-                              env={**os.environ, "TRIBUNAL_PROVIDER": "hosted",
-                                   "JEV_API_KEY": "", "TRIBUNAL_CONFIG": "/nonexistent.json"})
+                              capture_output=True, text=True, env=env)
         self.assertEqual(proc.returncode, 0)
         out = json.loads(proc.stdout)
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "allow")

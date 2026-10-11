@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 
 from hooks.tribunal import evaluate, load_config
@@ -7,6 +9,8 @@ def no_network(body, cfg):
     raise AssertionError("network must not be called on the fast path")
 
 
+# Use temp HOME so tests don't read real user profiles
+os.environ["HOME"] = tempfile.mkdtemp()
 CFG = load_config(env={"JEV_API_KEY": "test"})
 
 
