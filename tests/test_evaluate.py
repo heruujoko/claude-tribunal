@@ -1,5 +1,6 @@
 import unittest
 
+from tests.helpers import HomeTestCase
 from hooks.tribunal import evaluate, load_config
 
 
@@ -10,7 +11,7 @@ def no_network(body, cfg):
 CFG = load_config(env={"JEV_API_KEY": "test"})
 
 
-class FastPathTests(unittest.TestCase):
+class FastPathTests(HomeTestCase):
     def test_safe_tool(self):
         payload = {"tool_name": "Read", "tool_input": {"file_path": "/tmp/x"}}
         self.assertEqual(evaluate(payload, CFG, no_network), ("allow", "fast path: safe tool"))
