@@ -1,7 +1,6 @@
-import os
-import tempfile
 import unittest
 
+from tests.helpers import HomeTestCase
 from hooks.tribunal import evaluate, load_config
 
 
@@ -9,12 +8,10 @@ def no_network(body, cfg):
     raise AssertionError("network must not be called on the fast path")
 
 
-# Use temp HOME so tests don't read real user profiles
-os.environ["HOME"] = tempfile.mkdtemp()
 CFG = load_config(env={"JEV_API_KEY": "test"})
 
 
-class FastPathTests(unittest.TestCase):
+class FastPathTests(HomeTestCase):
     def test_safe_tool(self):
         payload = {"tool_name": "Read", "tool_input": {"file_path": "/tmp/x"}}
         self.assertEqual(evaluate(payload, CFG, no_network), ("allow", "fast path: safe tool"))

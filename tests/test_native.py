@@ -5,9 +5,10 @@ import unittest
 from unittest.mock import patch
 
 from hooks import tribunal
+from tests.helpers import HomeTestCase
 
 
-class NativeDecisionTests(unittest.TestCase):
+class NativeDecisionTests(HomeTestCase):
     def run_native(self, answer=None, error=None, payload=None, env=None):
         payload = payload or {"tool_name": "Bash", "tool_input": {"command": "make"}}
         cfg = tribunal.load_config(env={"JEV_API_KEY": "test", **(env or {})})

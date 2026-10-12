@@ -8,7 +8,7 @@ Like the Living Tribunal's three-faced judgment, every action is weighed into on
 
 | Verdict (`choice`) | Hook Decision | Effect |
 |---|---|---|
-| `allowed` | `allow` | Safe and reversible; runs without prompting |
+| `allowed` | `allow` | Clearly safe, bounded, profile-appropriate; runs without prompting |
 | `rejected` | `deny` + reason | Unsafe or destructive; blocked with explanation returned to Claude |
 | `human_ask` | `ask` | Sensitive or uncertain; defers to human confirmation |
 
@@ -42,7 +42,14 @@ Tribunal ships with three built-in evaluation profiles that provide workflow con
 - **office-design**: Document/spreadsheet/slide work — scoped file editing and export
 - **browsing**: Public read-only web retrieval — no account actions, publishing, or uploads
 
-Profiles provide context, not security exemptions. Immutable security guidance is always included. Selection is global across all Tribunal sessions and stored in `~/.claude/tribunal/profiles.json`. Use the `/tribunal:profile` skill to switch profiles. Corrupt or invalid profile storage triggers fail-to-human.
+Developer is an intentional new default for routine development calls. Profiles provide context, not security exemptions or fast-path rules. Immutable security guidance is always included, and tool input remains untrusted. Selection is global across all Tribunal sessions, stored in `~/.claude/tribunal/profiles.json`, and read on each evaluation (no restart needed).
+
+- `/tribunal:profile` lists, shows, and switches profiles.
+- `/tribunal:create-profile` interviews you, previews exact structured fields, saves after approval, and separately confirms activation. Custom profile fields are sent to the configured provider as workflow context; `ask_before` is model guidance, not a guaranteed prompt.
+
+A missing profile file means developer. Malformed, unreadable, oversized, symlinked, non-regular, or unknown-profile storage forces `ask`, even for local fast-path calls.
+
+`python3 tests/check_profile_verdicts.py` compares exact legacy prompts with each built-in profile across hosted and Cloudflare envelopes using scripted mock answers. It exercises request and response parsing only; it is not evidence that live model behavior improved. `--live` explicitly opts into sending synthetic fixtures to the configured provider and may incur spend.
 
 ---
 
