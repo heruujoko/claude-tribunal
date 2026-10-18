@@ -281,3 +281,15 @@ macOS wiki path is unavailable on this Linux machine; learnings remain here.
 project-deny-beats-user-allow and a disabled-source case. It found that project allow
 rules are dropped until the workspace is trusted, so Tribunal's ask stays in an untrusted
 workspace; documented in the README. Main-thread run: all checks pass.
+
+**33. Evaluation profiles — WIP checkpoint (2026-10-11).** Added developer (default), office-design, and browsing guidance, global selection in `~/.claude/tribunal/profiles.json`, the switching skill, and a structured custom-profile CLI. Shared security guidance remains in every Jev request; this is prompt guidance, not a deterministic security guarantee. The interview-based creation skill and live behavioral comparison are deferred. User requested stopping review and pushing this checkpoint for later review; it is not ready to install or merge. Main verified Python regressions (89 passed, 1 skipped because fish is unavailable), native adapter tests (21 passed), plugin validation (passed with the existing root-context warning), and real-engine permission checks (15 passed). No live provider calls were made. Resume work and known defects are recorded in `docs/plans/2026-10-11-evaluation-profiles-resume.md`.
+
+**34. Evaluation profiles completed (2026-10-12).** Closed the defects left by the checkpoint in entry 33:
+- **Storage.** Symlinked `~/.claude`/`~/.claude/tribunal`, the store and the lock are all refused before any mkdir or open. Non-regular files (including FIFOs) are rejected without hanging. Reads are bounded, require strict UTF-8 and reject duplicate JSON keys, and the store schema is strict. Writes are atomic and owner-only, and leave no temp file after a failure.
+- **Corrupt storage.** Profile storage that is corrupt (as opposed to missing) forces `ask` even for fast-path calls, with saved-permission eligibility false.
+- **Skills.** `/tribunal:create-profile` interviews one question at a time and previews the exact JSON. It saves via a Write-tool temp file and stdin (no shell interpolation of user text) and activates only as a separate step. Both management skills require explicit invocation and quote the plugin path.
+- **Tests.** Tests run in managed temporary homes with credential-free environments.
+- **Probe.** `tests/check_profile_verdicts.py` compares exact 1fba16e prompts with every built-in profile through the real request/parse/map path for both provider envelopes. In mock mode every track scores allow 5 / ask 2 / deny 3 / unsafe 0, but those are scripted answers, not evidence of fewer asks. `--live` is opt-in and was not run, so a real reduction in `human_ask` remains unproven.
+- **Docs.** The resume note was retired in favour of the design and plan docs.
+
+Main verified Python 107 passed / 1 skipped (fish unavailable), native adapter tests, plugin validation and real-engine permission checks.

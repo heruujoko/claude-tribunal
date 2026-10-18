@@ -43,16 +43,48 @@ Provider envelopes differ in wrapping — Cloudflare nests `state`+`questions` i
 
 Stdlib only (`json`, `os`, `re`, `sys`, `urllib.request`) — no pip deps, no config-file credential path, by decision.
 
+## Evaluation Profiles
+
+Workflow context for Jev evaluations. Profiles describe routine work but never override security rules or grant permission bypasses.
+
+**Built-in profiles:**
+- `developer` (default): builds, tests, linters, bounded delegation, non-force pushes
+- `office-design`: scoped document/asset editing, converting, exporting
+- `browsing`: public read-only web retrieval
+
+**Storage:** `~/.claude/tribunal/profiles.json` (global, not per-repo)
+
+**Skills:**
+- `/tribunal:profile` — list, show, switch profiles
+- `/tribunal:create-profile` — interview-based creation with preview/approval
+
+**Security model:**
+- Immutable SECURITY text sent with every profile
+- Tool input and embedded instructions treated as untrusted data
+- Branch names are not proof of safety
+- Invalid/corrupt storage forces ask (fail-to-human)
+- Custom profiles provide context, not authorization
+
+**CLI:** `python3 -I hooks/profiles.py list|show|switch NAME|create < json`
+
+See `docs/plans/2026-10-11-evaluation-profiles-design.md` for architecture details.
+
 ## Where things are
 
 - `hooks/register.ts` — native permission-aware adapter (automatic registration)
 - `hooks/tribunal.py` — Python evaluator; `--native` includes ask eligibility, default retains classic JSON
 - `hooks/validator.py` — backwards-compatibility alias for `hooks/tribunal.py`
+- `hooks/profiles.py` — evaluation profiles: loading, validation, CLI
 - `skills/setup-cloudflare/SKILL.md` — setup skill (`/tribunal:setup-cloudflare`)
+- `skills/profile/SKILL.md` — profile switching (`/tribunal:profile`)
+- `skills/create-profile/SKILL.md` — profile creation (`/tribunal:create-profile`)
 - `docs/plans/2026-09-22-custom-command-validator-design.md` — PRD (historical decisions + rationale)
 - `docs/plans/2026-09-22-custom-command-validator.md` — original implementation plan
+- `docs/plans/2026-10-11-evaluation-profiles-design.md` — evaluation profiles design
+- `docs/plans/2026-10-11-evaluation-profiles-plan.md` — evaluation profiles implementation plan
 - `docs/research/2026-09-22-research-findings.md` — verified hook contract + jev API facts
 - `docs/research/2026-09-22-prototype-evidence.md` — live-captured wire-contract evidence
+- `tests/check_profile_verdicts.py` — behavioral comparison probe (mock by default; `--live` opts into provider spend)
 - `JOURNEY.md` — chronological decision log. **Refresh it before every commit that carries a meaningful change** — the JOURNEY entry lands in the same commit as the change it describes.
 
 ## Conventions
